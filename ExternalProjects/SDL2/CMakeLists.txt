@@ -9,7 +9,7 @@ project(SDL2-BizHawk C CXX)
 # set(SDL_ATOMIC ON) # Used in HIDAPI (and disabling it just makes it emulate atomics rather than use intrinsics)
 set(SDL_AUDIO OFF)
 set(SDL_VIDEO ON) # Used in mupen64plus + OpenGL/D3D9 display methods
-set(SDL_RENDER OFF)
+set(SDL_RENDER ON) # We use the software renderer for GDI+ImGui 2D rendering
 set(SDL_EVENTS ON) # Implied by SDL_VIDEO and SDL_JOYSTICK
 set(SDL_JOYSTICK ON) # Used for our SDL2 input adapter
 set(SDL_HAPTIC OFF)
@@ -69,6 +69,7 @@ set(SDL_DIRECTFB OFF)
 set(SDL_DUMMYVIDEO OFF)
 set(SDL_RPI OFF)
 set(SDL_RENDER_D3D OFF)
+set(SDL_RENDER_METAL OFF)
 set(SDL_VIVANTE OFF)
 set(SDL_VULKAN OFF)
 set(SDL_KMSDRM OFF)
@@ -120,7 +121,7 @@ if(WIN32)
 		target_compile_options(usb PRIVATE -w)
 	endif()
 
-	set_target_properties(usb PROPERTIES VERSION 1.0.26)
+	set_target_properties(usb PROPERTIES VERSION 1.0.27)
 	target_include_directories(usb BEFORE
 		PUBLIC libusb/libusb
 		PRIVATE libusb/msvc
@@ -134,6 +135,7 @@ set_target_properties(SDL2 PROPERTIES
 	NO_SONAME ON
 	OUTPUT_NAME "SDL2"
 )
+target_link_options(SDL2 PRIVATE -s)
 
 # Copy output to our dll folders
 # This requires a bit of magic (add_custom_command is not allowed for targets made with add_subdirectory)

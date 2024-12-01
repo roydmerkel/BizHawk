@@ -1,12 +1,10 @@
-using System;
-
 namespace BizHawk.Emulation.DiscSystem.CUE
 {
 	// extra synths using SS_Base, not used by CUEs but used for other formats
 
 	/// <summary>
 	/// Represents a Mode2 Form1 2048-byte sector
-	/// Only used by MDS
+	/// Only used by NRG, MDS, and CHD
 	/// </summary>
 	internal class SS_Mode2_Form1_2048 : SS_Base
 	{
@@ -36,7 +34,7 @@ namespace BizHawk.Emulation.DiscSystem.CUE
 
 	/// <summary>
 	/// Represents a Mode2 Form1 2324-byte sector
-	/// Only used by MDS
+	/// Only used by MDS and CHD
 	/// </summary>
 	internal class SS_Mode2_Form2_2324 : SS_Base
 	{
@@ -82,7 +80,7 @@ namespace BizHawk.Emulation.DiscSystem.CUE
 
 	/// <summary>
 	/// Represents a full 2448-byte sector with interleaved subcode
-	/// Only used by MDS and CDI
+	/// Only used by MDS, NRG, and CDI
 	/// </summary>
 	internal class SS_2448_Interleaved : SS_Base
 	{

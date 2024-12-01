@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics;
 using System.Security.Cryptography;
 
@@ -19,7 +18,7 @@ namespace BizHawk.Common
 
 		public /*static readonly*/const string EmptyFile = "D41D8CD98F00B204E9800998ECF8427E";
 
-#if NET6_0
+#if NET5_0_OR_GREATER
 		public static byte[] Compute(ReadOnlySpan<byte> data)
 			=> MD5.HashData(data);
 #else
@@ -32,7 +31,7 @@ namespace BizHawk.Common
 				if (_md5Impl == null)
 				{
 					_md5Impl = MD5.Create();
-					Debug.Assert(_md5Impl.CanReuseTransform && _md5Impl.HashSize is EXPECTED_LENGTH);
+					Debug.Assert(_md5Impl.CanReuseTransform && _md5Impl.HashSize is EXPECTED_LENGTH, "nonstandard implementation?");
 				}
 				return _md5Impl;
 			}

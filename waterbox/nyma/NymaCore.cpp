@@ -68,12 +68,13 @@ ECL_EXPORT bool InitRom(const InitData& data)
 		GameFile gf({
 			&NVFS,
 			"",
+			data.FileNameFull,
 			gamestream.get(),
 			data.FileNameExt,
 			data.FileNameBase,
-			&NVFS,
+			{&NVFS,
 			"",
-			data.FileNameBase
+			data.FileNameBase}
 		});
 
 		Game->Load(&gf);
@@ -141,7 +142,7 @@ ECL_EXPORT void FrameAdvance(MyFrameInfo& frame)
 
 	if (frame.Command)
 		Game->DoSimpleCommand(frame.Command);
-	
+
 	memcpy(InputPortData, frame.InputPortData, sizeof(InputPortData));
 
 	if (Game->TransformInput)
@@ -253,6 +254,7 @@ struct SystemInfo
 	int32_t NominalWidth;
 	int32_t NominalHeight;
 	int32_t VideoSystem;
+	int32_t GameType;
 	int32_t FpsFixed;
 	int64_t MasterClock;
 	int32_t LcmWidth;
@@ -271,6 +273,7 @@ ECL_EXPORT SystemInfo* GetSystemInfo()
 	SI.NominalWidth = Game->nominal_width;
 	SI.NominalHeight = Game->nominal_height;
 	SI.VideoSystem = Game->VideoSystem;
+	SI.GameType = Game->GameType;
 	SI.FpsFixed = Game->fps;
 	SI.MasterClock = Game->MasterClock;
 	SI.LcmWidth = Game->lcm_width;
@@ -280,6 +283,11 @@ ECL_EXPORT SystemInfo* GetSystemInfo()
 	SI.PointerOffsetX = Game->mouse_offs_x;
 	SI.PointerOffsetY = Game->mouse_offs_y;
 	return &SI;
+}
+
+ECL_EXPORT const char* GetInputDeviceOverride(uint32_t port)
+{
+	return Game->DesiredInput.size() > port ? Game->DesiredInput[port].device_name : nullptr;
 }
 
 ECL_EXPORT const char* GetLayerData()
@@ -324,6 +332,7 @@ ECL_EXPORT void DumpInputs()
 		MAYBENULL(a->ShortName, x.ShortName);
 		MAYBENULL(a->FullName, x.FullName);
 		MAYBENULL(a->DefaultDeviceShortName, x.DefaultDevice);
+		a->Flags = (PortFlags)x.Flags;
 		for (auto& y: x.DeviceInfo)
 		{
 			std::unique_ptr<NDeviceInfoT> b(new NDeviceInfoT());

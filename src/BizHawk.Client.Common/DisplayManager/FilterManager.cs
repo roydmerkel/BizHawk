@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Drawing;
@@ -7,7 +6,7 @@ using System.Numerics;
 
 using BizHawk.Client.Common.Filters;
 
-using BizHawk.Bizware.BizwareGL;
+using BizHawk.Bizware.Graphics;
 
 namespace BizHawk.Client.Common.FilterManager
 {
@@ -38,15 +37,15 @@ namespace BizHawk.Client.Common.FilterManager
 
 	public interface IRenderTargetProvider
 	{
-		RenderTarget Get(Size size);
+		IRenderTarget Get(Size size);
 	}
 
 	public class FilterProgram
 	{
 		private readonly Dictionary<string, BaseFilter> _filterNameIndex = new();
 
-		public readonly IList<BaseFilter> Filters = new List<BaseFilter>();
-		public readonly IList<ProgramStep> Program = new List<ProgramStep>();
+		public readonly List<BaseFilter> Filters = new();
+		public readonly List<ProgramStep> Program = new();
 
 		public BaseFilter this[string name]
 		{
@@ -69,9 +68,13 @@ namespace BizHawk.Client.Common.FilterManager
 		public IGL GL;
 		public IRenderTargetProvider RenderTargetProvider;
 
-		public RenderTarget CurrRenderTarget;
+		public IRenderTarget CurrRenderTarget;
 
-		public RenderTarget GetTempTarget(int width, int height)
+		// DPI / 96.0 indicates the display scaling
+		// this is mainly relevant for OSD
+		public int ControlDpi;
+
+		public IRenderTarget GetTempTarget(int width, int height)
 		{
 			return RenderTargetProvider.Get(new(width, height));
 		}
@@ -282,7 +285,7 @@ namespace BizHawk.Client.Common.FilterManager
 					if (ps.Type == ProgramStepType.NewTarget)
 					{
 						var size = (Size)ps.Args;
-						Debug.Assert(size == outsize);
+						Debug.Assert(size == outsize, "size of last " + nameof(ProgramStepType.NewTarget) + " was set wrong");
 						Program[i] = new(ProgramStepType.FinalTarget, size, ps.Comment);
 						break;
 					}

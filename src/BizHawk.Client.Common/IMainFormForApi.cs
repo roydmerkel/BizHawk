@@ -1,4 +1,3 @@
-using System;
 using System.Drawing;
 
 using BizHawk.Emulation.Common;
@@ -52,9 +51,10 @@ namespace BizHawk.Client.Common
 		bool FlushSaveRAM(bool autosave = false);
 
 		/// <remarks>only referenced from <c>EmuClientApi</c></remarks>
-		void FrameAdvance();
+		void FrameAdvance(bool discardApiHawkSurfaces = true);
 
-		void FrameBufferResized();
+		/// <param name="forceWindowResize">Override <see cref="Common.Config.ResizeWithFramebuffer"/></param>
+		void FrameBufferResized(bool forceWindowResize = false);
 
 		void FrameSkipMessage();
 

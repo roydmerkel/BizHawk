@@ -1,9 +1,10 @@
-﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+
 using Newtonsoft.Json;
-using BizHawk.Bizware.BizwareGL;
+
+using BizHawk.Bizware.Graphics;
 using BizHawk.Common.IOExtensions;
 
 namespace BizHawk.Client.Common
@@ -292,10 +293,10 @@ namespace BizHawk.Client.Common
 		{
 			// intentionally not using linq here because this is called many times per frame
 			int index = -1;
-			var timeStamp = DateTime.MaxValue;
+			var timeStamp = DateTime.MinValue;
 			for (int i = 0; i < list.Count; i++)
 			{
-				if (list[i].Frame == frame && list[i].TimeStamp < timeStamp)
+				if (list[i].Frame == frame && list[i].TimeStamp > timeStamp)
 				{
 					index = i;
 					timeStamp = list[i].TimeStamp;

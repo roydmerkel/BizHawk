@@ -1,31 +1,42 @@
-using System;
-using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Windows.Forms;
-
-using SDGraphics = System.Drawing.Graphics;
 
 namespace BizHawk.Bizware.Graphics.Controls
 {
 	internal sealed class GDIPlusControl : GraphicsControl
 	{
-		public GDIPlusControl(Func<Func<(SDGraphics Graphics, Rectangle Rectangle)>, GDIPlusRenderTarget> createControlRenderTarget)
-		{
-			RenderTarget = createControlRenderTarget(GetControlRenderContext);
-
-			SetStyle(ControlStyles.UserPaint, true);
-			SetStyle(ControlStyles.OptimizedDoubleBuffer, true);
-			SetStyle(ControlStyles.Opaque, true);
-			SetStyle(ControlStyles.UserMouse, true);
-		}
-
-		private (SDGraphics Graphics, Rectangle Rectangle) GetControlRenderContext()
-			=> (CreateGraphics(), ClientRectangle);
-
 		/// <summary>
 		/// The render target for rendering to this control
 		/// </summary>
-		private GDIPlusRenderTarget RenderTarget { get; }
+		private readonly GDIPlusControlRenderTarget _renderTarget;
+
+		public GDIPlusControl(Func<Func<GDIPlusControlRenderContext>, GDIPlusControlRenderTarget> createControlRenderTarget)
+		{
+			_renderTarget = createControlRenderTarget(GetControlRenderContext);
+
+			SetStyle(ControlStyles.UserPaint, true);
+			SetStyle(ControlStyles.Opaque, true);
+			SetStyle(ControlStyles.AllPaintingInWmPaint, true);
+			SetStyle(ControlStyles.UserMouse, true);
+			DoubleBuffered = false;
+		}
+
+		private GDIPlusControlRenderContext GetControlRenderContext()
+		{
+			var graphics = CreateGraphics();
+			graphics.CompositingMode = CompositingMode.SourceCopy;
+			graphics.CompositingQuality = CompositingQuality.HighSpeed;
+			return new(graphics, ClientRectangle with
+			{
+				Width = Math.Max(ClientRectangle.Width, 1),
+				Height = Math.Max(ClientRectangle.Height, 1)
+			});
+		}
+
+		public override void AllowTearing(bool state)
+		{
+			// not controllable
+		}
 
 		public override void SetVsync(bool state)
 		{
@@ -33,30 +44,42 @@ namespace BizHawk.Bizware.Graphics.Controls
 		}
 
 		public override void Begin()
-			=> RenderTarget.CreateGraphics();
+		{
+		}
 
 		public override void End()
 		{
 		}
 
+		protected override void OnHandleCreated(EventArgs e)
+		{
+			base.OnHandleCreated(e);
+			_renderTarget.CreateBufferedGraphics();
+		}
+
+		protected override void OnHandleDestroyed(EventArgs e)
+		{
+			base.OnHandleDestroyed(e);
+			_renderTarget.Dispose();
+		}
+
 		protected override void OnResize(EventArgs e)
 		{
 			base.OnResize(e);
-			RenderTarget.CreateGraphics();
+			_renderTarget.CreateBufferedGraphics();
 		}
 
 		public override void SwapBuffers()
 		{
-			if (RenderTarget.BufferedGraphics == null)
+			if (_renderTarget.BufferedGraphics is null)
 			{
 				return;
 			}
 
-			using var g = CreateGraphics();
-			// not sure we had proof we needed this but it cant hurt
-			g.CompositingMode = CompositingMode.SourceCopy;
-			g.CompositingQuality = CompositingQuality.HighSpeed;
-			RenderTarget.BufferedGraphics.Render(g);
+			using var graphics = CreateGraphics();
+			graphics.CompositingMode = CompositingMode.SourceCopy;
+			graphics.CompositingQuality = CompositingQuality.HighSpeed;
+			_renderTarget.BufferedGraphics.Render(graphics);
 		}
 	}
 }

@@ -1,4 +1,3 @@
-﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
@@ -235,9 +234,7 @@ namespace BizHawk.Client.Common
 			// TODO - use more sophisticated IDer
 			var discType = new DiscIdentifier(disc).DetectDiscType();
 			var discHasher = new DiscHasher(disc);
-			var discHash = discType == DiscType.SonyPSX
-				? discHasher.Calculate_PSX_BizIDHash()
-				: discHasher.OldHash();
+			var discHash = discHasher.CalculateBizHash(discType);
 
 			var game = Database.CheckDatabase(discHash);
 			if (game is not null) return game;
@@ -347,7 +344,7 @@ namespace BizHawk.Client.Common
 			var discs = m3u.Entries
 				.Select(e => e.Path)
 				.Where(p => Disc.IsValidExtension(Path.GetExtension(p)))
-				.Select(path => (p: path, d: DiscExtensions.CreateAnyType(path, str => DoLoadErrorCallback(str, "???", LoadErrorType.DiscError))))
+				.Select(p => (p, d: DiscExtensions.CreateAnyType(p, str => DoLoadErrorCallback(str, "???", LoadErrorType.DiscError))))
 				.Where(a => a.d != null)
 				.Select(a => (IDiscAsset)new DiscAsset
 				{
@@ -356,7 +353,7 @@ namespace BizHawk.Client.Common
 					DiscName = Path.GetFileNameWithoutExtension(a.p)
 				})
 				.ToList();
-			if (m3u.Entries.Count == 0)
+			if (discs.Count == 0)
 				throw new InvalidOperationException("Couldn't load any contents of the M3U as discs");
 
 			game = MakeGameFromDisc(discs[0].DiscData, Path.GetExtension(m3u.Entries[0].Path), discs[0].DiscName);
@@ -488,34 +485,6 @@ namespace BizHawk.Client.Common
 						game.System = VSystemID.Raw.SGB;
 					}
 					break;
-				case VSystemID.Raw.PSX when ext is ".bin":
-					const string FILE_EXT_CUE = ".cue";
-					var cuePath = TempFileManager.GetTempFilename(friendlyName: "syn", dotAndExtension: FILE_EXT_CUE, delete: false);
-					DiscMountJob.CreateSyntheticCue(cueFilePath: cuePath, binFilePath: file.Name);
-					var gameBak = game;
-					var nextEmulatorBak = nextEmulator;
-					try
-					{
-						if (LoadDisc(
-							path: cuePath,
-							nextComm,
-							new(cuePath),
-							ext: FILE_EXT_CUE,
-							forcedCoreName: forcedCoreName,
-							out nextEmulator,
-							out game))
-						{
-							return;
-						}
-						Console.WriteLine("synthesised .cue failed to load");
-					}
-					catch (Exception e)
-					{
-						Console.WriteLine($"synthesised .cue failed to load: {e}");
-					}
-					game = gameBak;
-					nextEmulator = nextEmulatorBak;
-					break;
 			}
 			var cip = new CoreInventoryParameters(this)
 			{
@@ -557,6 +526,20 @@ namespace BizHawk.Client.Common
 			game = rom.GameInfo;
 		}
 
+		// HACK due to MAME wanting CHDs as hard drives / handling it on its own (bad design, I know!)
+		// only matters for XML, as CHDs are never the "main" rom for MAME
+		// (in general, this is kind of bad as CHD hard drives might be useful for other future cores?)
+		private static bool IsDiscForXML(string system, string path)
+		{
+			var ext = Path.GetExtension(path);
+			if (system == VSystemID.Raw.Arcade && ext.ToLowerInvariant() == ".chd")
+			{
+				return false;
+			}
+
+			return Disc.IsValidExtension(ext);
+		}
+
 		private bool LoadXML(string path, CoreComm nextComm, HawkFile file, string forcedCoreName, out IEmulator nextEmulator, out RomGame rom, out GameInfo game)
 		{
 			nextEmulator = null;
@@ -573,7 +556,7 @@ namespace BizHawk.Client.Common
 					Comm = nextComm,
 					Game = game,
 					Roms = xmlGame.Assets
-						.Where(kvp => !Disc.IsValidExtension(Path.GetExtension(kvp.Key)))
+						.Where(kvp => !IsDiscForXML(system, kvp.Key))
 						.Select(kvp => (IRomAsset)new RomAsset
 						{
 							RomData = kvp.Value,
@@ -584,7 +567,7 @@ namespace BizHawk.Client.Common
 						})
 						.ToList(),
 					Discs = xmlGame.AssetFullPaths
-						.Where(p => Disc.IsValidExtension(Path.GetExtension(p)))
+						.Where(p => IsDiscForXML(system, p))
 						.Select(discPath => (p: discPath, d: DiscExtensions.CreateAnyType(discPath, str => DoLoadErrorCallback(str, system, LoadErrorType.DiscError))))
 						.Where(a => a.d != null)
 						.Select(a => (IDiscAsset)new DiscAsset
@@ -861,6 +844,8 @@ namespace BizHawk.Client.Common
 
 			public static readonly IReadOnlyCollection<string> A78 = new[] { "a78" };
 
+			public static readonly IReadOnlyCollection<string> Amiga = new[] { "adf", "adz", "dms", "fdi", /*"hdf", "ipf", "lha"*/ };
+
 			public static readonly IReadOnlyCollection<string> AppleII = new[] { "dsk", "do", "po" };
 
 			public static readonly IReadOnlyCollection<string> Arcade = new[] { "zip", "7z", "chd" };
@@ -889,7 +874,7 @@ namespace BizHawk.Client.Common
 
 			public static readonly IReadOnlyCollection<string> N64DD = new[] { "ndd" };
 
-			public static readonly IReadOnlyCollection<string> NDS = new[] { "nds" };
+			public static readonly IReadOnlyCollection<string> NDS = new[] { "nds", "srl", "dsi", "ids" };
 
 			public static readonly IReadOnlyCollection<string> NES = new[] { "nes", "fds", "unf" };
 
@@ -915,11 +900,12 @@ namespace BizHawk.Client.Common
 
 			public static readonly IReadOnlyCollection<string> WSWAN = new[] { "ws", "wsc", "pc2" };
 
-			public static readonly IReadOnlyCollection<string> ZXSpectrum = new[] { "tzx", "tap", "dsk", "pzx" };
+			public static readonly IReadOnlyCollection<string> ZXSpectrum = new[] { "tzx", "tap", "dsk", "pzx", "ipf" };
 
 			public static readonly IReadOnlyCollection<string> AutoloadFromArchive = Array.Empty<string>()
 				.Concat(A26)
 				.Concat(A78)
+				.Concat(Amiga)
 				.Concat(AppleII)
 				.Concat(C64)
 				.Concat(Coleco)
@@ -990,6 +976,7 @@ namespace BizHawk.Client.Common
 			new FilesystemFilter("Vectrex", RomFileExtensions.VEC),
 			new FilesystemFilter("MSX", RomFileExtensions.MSX),
 			new FilesystemFilter("Arcade", RomFileExtensions.Arcade),
+			new FilesystemFilter("Amiga", RomFileExtensions.Amiga),
 			FilesystemFilter.EmuHawkSaveStates)
 		{
 			CombinedEntryDesc = "Everything",

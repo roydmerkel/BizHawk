@@ -28,16 +28,16 @@ namespace BizHawk.Client.Common
 		IMovieController MovieController { get; }
 
 		/// <summary>
-		/// Provides a source for sticky controls ot use when recording
+		/// Provides a source for sticky controls to use when recording
 		/// </summary>
-		IStickyAdapter StickySource { get; set; }
+		IController StickySource { get; set; }
 
 		/// <summary>
 		/// Represents the input source that is fed to
 		/// the movie for the purpose of recording, if active,
 		/// or to simply pass through if inactive
 		/// </summary>
-		IInputAdapter MovieIn { get; set; }
+		IController MovieIn { get; set; }
 
 		/// <summary>
 		/// Represents the movie input in the input chain
@@ -48,22 +48,10 @@ namespace BizHawk.Client.Common
 
 		/// <summary>
 		/// Creates a <see cref="IMovieController" /> instance based on the
-		/// given button definition if provided else the
-		/// current <see cref="MovieController" /> button definition
-		/// will be used
+		/// given button definition if provided else the current
+		/// <see cref="MovieController"/>s button definition will be used
 		/// </summary>
-		IMovieController GenerateMovieController(ControllerDefinition definition = null);
-
-		/// <summary>
-		/// Hack only used for TAStudio when starting a new movie
-		/// This is due to needing to save a "dummy" default.tasproj
-		/// This dummy file's initial save bypasses the normal queue/run
-		/// new movie code (which normally sets the controller), although
-		/// once it saves it goes through the normal queue/run code anyway.
-		/// TODO: Stop relying on this dummy file so we do not need this ugly hack
-		/// </summary>
-		/// <param name="definition">current IEmulator ControllerDefinition</param>
-		void SetMovieController(ControllerDefinition definition);
+		IMovieController GenerateMovieController(ControllerDefinition definition = null, string logKey = null);
 
 		void HandleFrameBefore();
 		void HandleFrameAfter();
@@ -77,7 +65,12 @@ namespace BizHawk.Client.Common
 		/// When initializing a movie, it will be stored until Rom loading processes have been completed, then it will be moved to the Movie property
 		/// If an existing movie is still active, it will remain in the Movie property while the new movie is queued
 		/// </summary>
-		void QueueNewMovie(IMovie movie, bool record, string systemId, IDictionary<string, string> preferredCores);
+		void QueueNewMovie(
+			IMovie movie,
+			string systemId,
+			string loadedRomHash,
+			PathEntryCollection pathEntries,
+			IDictionary<string, string> preferredCores);
 
 		/// <summary>
 		/// Sets the Movie property with the QueuedMovie, clears the queued movie, and starts the new movie
@@ -94,7 +87,11 @@ namespace BizHawk.Client.Common
 		/// </summary>
 		void ConvertToTasProj();
 
-		IMovie Get(string path);
+		/// <summary>
+		/// Create a new (Tas)Movie with the given path as filename. If <paramref name="loadMovie"/> is true,
+		/// will also attempt to load an existing movie from <paramref name="path"/>.
+		/// </summary>
+		IMovie Get(string path, bool loadMovie = false);
 
 		string BackupDirectory { get; set; }
 

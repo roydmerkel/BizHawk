@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics;
 using System.Security.Cryptography;
 
@@ -19,7 +18,7 @@ namespace BizHawk.Common
 
 		public /*static readonly*/const string EmptyFile = "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855";
 
-#if NET6_0
+#if NET5_0_OR_GREATER
 		public static byte[] Compute(ReadOnlySpan<byte> data)
 			=> SHA256.HashData(data);
 #else
@@ -32,7 +31,7 @@ namespace BizHawk.Common
 				if (_sha256Impl == null)
 				{
 					_sha256Impl = SHA256.Create();
-					Debug.Assert(_sha256Impl.CanReuseTransform && _sha256Impl.HashSize is EXPECTED_LENGTH);
+					Debug.Assert(_sha256Impl.CanReuseTransform && _sha256Impl.HashSize is EXPECTED_LENGTH, "nonstandard implementation?");
 				}
 				return _sha256Impl;
 			}

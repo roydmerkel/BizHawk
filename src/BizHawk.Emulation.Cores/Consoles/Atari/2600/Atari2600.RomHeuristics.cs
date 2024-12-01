@@ -1,4 +1,3 @@
-﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -41,7 +40,7 @@ namespace BizHawk.Emulation.Cores.Atari.Atari2600
 					return "F8SC";
 				}
 
-				if (rom.Take(4096).SequenceEqual(rom.Skip(4096).Take(4096)))
+				if (rom.AsSpan(start: 0, length: 4096).SequenceEqual(rom.AsSpan(start: 4096, length: 4096)))
 				{
 					return "4K"; // Again if it is simply the same 4k twice. Got this scenario from Stella logic.  Will assume a good reason for it
 				}
@@ -403,8 +402,9 @@ namespace BizHawk.Emulation.Cores.Atari.Atari2600
 			// These signatures are attributed to the MESS project
 			return ContainsAny(rom, new List<byte[]>
 			{
-				new byte[] { 0x44, 0x50, 0x43, 0x2B },
-				new byte[] { 0x44, 0x50, 0x43, 0x2B },
+				// why is this checking the same value twice? ...
+				"DPC+"u8.ToArray(),
+				"DPC+"u8.ToArray(),
 			});
 		}
 

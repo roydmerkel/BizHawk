@@ -1,5 +1,5 @@
-﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -114,13 +114,12 @@ namespace BizHawk.Bizware.Audio
 		{
 			if (_deviceResetRequired)
 			{
-				_deviceResetRequired = false;
-
 				StopSound();
 				StopWav();
 				_masteringVoice.Dispose();
 				_device.Dispose();
 
+				_deviceResetRequired = false;
 				_device = XAudio2.XAudio2Create();
 				_device.CriticalError += (_, _) => _deviceResetRequired = true;
 				_masteringVoice = _device.CreateMasteringVoice(
@@ -180,11 +179,12 @@ namespace BizHawk.Bizware.Audio
 			StopWav();
 			_wavVoice = _device.CreateSourceVoice(format);
 			_wavBuffer = new(unchecked((int)wavStream.Length));
-
-			wavStream.Read(_wavBuffer.AsSpan());
+			var bufSpan = _wavBuffer.AsSpan();
+			var bytesRead = wavStream.Read(bufSpan);
+			Debug.Assert(bytesRead == bufSpan.Length, "reached end-of-file while reading .wav");
 			if (wavStream.Format == SDL2WavStream.AudioFormat.S16MSB)
 			{
-				EndiannessUtils.MutatingByteSwap16(_wavBuffer.AsSpan());
+				EndiannessUtils.MutatingByteSwap16(bufSpan);
 			}
 
 			_wavVoice.SubmitSourceBuffer(_wavBuffer);

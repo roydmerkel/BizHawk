@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 using BizHawk.Common;
 using BizHawk.Common.StringExtensions;
@@ -9,7 +8,7 @@ using BizHawk.Emulation.DiscSystem;
 
 namespace BizHawk.Emulation.Cores.Sony.PSX
 {
-	[PortedCore(CoreNames.Nymashock, "Mednafen Team", "1.29.0", "https://mednafen.github.io/releases/")]
+	[PortedCore(CoreNames.Nymashock, "Mednafen Team", "1.32.1", "https://mednafen.github.io/releases/")]
 	public class Nymashock : NymaCore, IRegionable, ICycleTiming, IRedumpDiscChecksumInfo
 	{
 		public string RomDetails { get; }
@@ -62,15 +61,13 @@ namespace BizHawk.Emulation.Cores.Sony.PSX
 		public Nymashock(CoreLoadParameters<NymaSettings, NymaSyncSettings> lp)
 			: base(lp.Comm, VSystemID.Raw.PSX, "PSX Front Panel", lp.Settings, lp.SyncSettings)
 		{
-			if (lp.Roms.Count > 0)
-				throw new InvalidOperationException("To load a PSX game, please load the CUE file and not the BIN file.");
-			var firmwares = new Dictionary<string, FirmwareID>
+			var firmwareIDMap = new Dictionary<string, FirmwareID>
 			{
 				{ "FIRMWARE:$J", new("PSX", "J") },
 				{ "FIRMWARE:$U", new("PSX", "U") },
 				{ "FIRMWARE:$E", new("PSX", "E") },
 			};
-			DoInit<LibNymaCore>(lp, "shock.wbx", firmwares);
+			DoInit<LibNymaCore>(lp, "shock.wbx", firmwareIDMap);
 
 			_cachedSettingsInfo ??= SettingsInfo.Clone();
 
@@ -118,7 +115,7 @@ namespace BizHawk.Emulation.Cores.Sony.PSX
 			{ "psx.input.port7.gun_chairs", new() { NonSync = true } },
 			{ "psx.input.port8.gun_chairs", new() { NonSync = true } },
 
-			{ "psx.dbg_exe_cdpath", new() { Hide = true } },
+			{ "psx.dbg_exe_cdpath", new() { Hide = true, Default = string.Empty } },
 
 			{ "psx.spu.resamp_quality", new() { NonSync = true } },
 			{ "psx.input.mouse_sensitivity", new() { Hide = true } },

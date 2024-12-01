@@ -1,4 +1,3 @@
-﻿using System;
 using System.Drawing;
 using System.Linq;
 
@@ -21,6 +20,7 @@ namespace BizHawk.Client.Common
 			=> DisplaySurfaceIDParser.Parse(surfaceName) ?? _rememberedSurfaceID;
 
 #pragma warning disable CS0612
+#pragma warning disable CS0618
 		[LuaDeprecatedMethod]
 		[LuaMethod("DrawNew", "Changes drawing target to the specified lua surface name. This may clobber any previous drawing to this surface (pass false if you don't want it to)")]
 		public void DrawNew(string name, bool? clear = true)
@@ -31,6 +31,7 @@ namespace BizHawk.Client.Common
 		public void DrawFinish()
 			=> APIs.Gui.DrawFinish();
 #pragma warning restore CS0612
+#pragma warning restore CS0618
 
 		[LuaMethodExample("gui.addmessage( \"Some message\" );")]
 		[LuaMethod("addmessage", "Adds a message to the OSD's message area")]
@@ -92,7 +93,7 @@ namespace BizHawk.Client.Common
 			}
 			catch (Exception)
 			{
-				return;
+				// ignored
 			}
 		}
 
@@ -232,7 +233,7 @@ namespace BizHawk.Client.Common
 			}
 			catch (Exception)
 			{
-				return;
+				// ignored
 			}
 		}
 
@@ -304,7 +305,7 @@ namespace BizHawk.Client.Common
 					surfaceName: surfaceName);
 
 		[LuaMethodExample("gui.pixelText( 16, 32, \"Some message\", 0x7F0000FF, 0x00007FFF, \"Arial Narrow\" );")]
-		[LuaMethod("pixelText", "Draws the given message in the emulator screen space (like all draw functions) at the given x,y coordinates and the given color. The default color is white. Two font families are available, \"fceux\" and \"gens\" (or  \"0\" and \"1\" respectively), both are monospace and have the same size as in the emulators they've been taken from. If no font family is specified, it uses \"gens\" font, unless that's overridden via gui.defaultPixelFont()")]
+		[LuaMethod("pixelText", "Draws the given message in the emulator screen space (like all draw functions) at the given x,y coordinates and the given color. The default color is white. Two font families are available, \"fceux\" and \"gens\" (or  \"0\" and \"1\" respectively), both are monospace and have the same size as in the emulators they've been taken from. If no font family is specified, it uses \"gens\" font, unless that's overridden via gui.defaultPixelFont().")]
 		public void PixelText(
 			int x,
 			int y,
@@ -313,10 +314,10 @@ namespace BizHawk.Client.Common
 			[LuaColorParam] object backcolor = null,
 			string fontfamily = null,
 			string surfaceName = null)
-				=> APIs.Gui.PixelText(x, y, message, _th.SafeParseColor(forecolor), _th.SafeParseColor(backcolor) ?? APIs.Gui.GetDefaultTextBackground().Value, fontfamily, surfaceID: UseOrFallback(surfaceName));
+				=> APIs.Gui.PixelText(x, y, message, _th.SafeParseColor(forecolor), _th.SafeParseColor(backcolor) ?? APIs.Gui.GetDefaultTextBackground(), fontfamily, surfaceID: UseOrFallback(surfaceName));
 
 		[LuaMethodExample("gui.text( 16, 32, \"Some message\", 0x7F0000FF, \"bottomleft\" );")]
-		[LuaMethod("text", "Displays the given text on the screen at the given coordinates. Optional Foreground color. The optional anchor flag anchors the text to one of the four corners. Anchor flag parameters: topleft, topright, bottomleft, bottomright")]
+		[LuaMethod("text", "Displays the given text on the screen at the given coordinates. Optional Foreground color. The optional anchor flag anchors the text to one of the four corners. Anchor flag parameters: topleft, topright, bottomleft, bottomright. This function is generally much faster than other text drawing functions, at the cost of customization.")]
 		public void Text(
 			int x,
 			int y,

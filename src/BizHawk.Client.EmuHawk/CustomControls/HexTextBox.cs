@@ -1,7 +1,6 @@
-﻿using System;
 using System.Globalization;
 using System.Windows.Forms;
-
+using BizHawk.Client.EmuHawk.CustomControls;
 using BizHawk.Common.StringExtensions;
 using BizHawk.Common.NumberExtensions;
 
@@ -15,7 +14,7 @@ namespace BizHawk.Client.EmuHawk
 		void SetFromRawInt(int? rawInt);
 	}
 
-	public class HexTextBox : TextBox, INumberBox
+	public class HexTextBox : ClipboardEventTextBox, INumberBox
 	{
 		private string _addressFormatStr = "";
 		private long? _maxSize;
@@ -133,6 +132,18 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 			base.OnTextChanged(e);
+		}
+
+		protected override void OnPaste(PasteEventArgs e)
+		{
+			if (e.ContainsText)
+			{
+				string text = e.Text.CleanHex();
+				PasteWithMaxLength(text);
+				e.Handled = true;
+			}
+
+			base.OnPaste(e);
 		}
 
 		public int? ToRawInt()

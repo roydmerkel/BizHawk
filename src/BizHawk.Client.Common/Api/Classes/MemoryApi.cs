@@ -1,8 +1,8 @@
-﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 
 using BizHawk.Common;
+using BizHawk.Common.NumberExtensions;
 using BizHawk.Emulation.Common;
 
 namespace BizHawk.Client.Common
@@ -188,7 +188,8 @@ namespace BizHawk.Client.Common
 		public IReadOnlyCollection<string> GetMemoryDomainList()
 			=> DomainList.Select(static domain => domain.Name).ToList();
 
-		public uint GetMemoryDomainSize(string name = null) => (uint) NamedDomainOrCurrent(name).Size;
+		public uint GetMemoryDomainSize(string name)
+			=> (uint) NamedDomainOrCurrent(name).Size;
 
 		public string GetCurrentMemoryDomain() => Domain.Name;
 
@@ -287,10 +288,10 @@ namespace BizHawk.Client.Common
 				LogCallback($"Warning: Attempted read {addr} outside memory size of {d.Size}");
 				return default;
 			}
-			return BitConverter.ToSingle(BitConverter.GetBytes(d.PeekUint(addr, _isBigEndian)), 0);
+			return NumberExtensions.ReinterpretAsF32(d.PeekUint(addr, _isBigEndian));
 		}
 
-		public void WriteFloat(long addr, double value, string domain = null)
+		public void WriteFloat(long addr, float value, string domain = null)
 		{
 			var d = NamedDomainOrCurrent(domain);
 			if (!d.Writable)
@@ -303,7 +304,7 @@ namespace BizHawk.Client.Common
 				LogCallback($"Warning: Attempted write {addr} outside memory size of {d.Size}");
 				return;
 			}
-			d.PokeUint(addr, BitConverter.ToUInt32(BitConverter.GetBytes((float) value), 0), _isBigEndian);
+			d.PokeUint(addr, NumberExtensions.ReinterpretAsUInt32(value), _isBigEndian);
 		}
 
 		public int ReadS8(long addr, string domain = null) => (sbyte) ReadUnsigned(addr, 1, domain);

@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -18,6 +17,13 @@ namespace BizHawk.Client.EmuHawk
 	public abstract class LibRCheevos
 	{
 		private const CallingConvention cc = CallingConvention.Cdecl;
+
+		private const UnmanagedType STR_MARSHAL_HINT
+#if NETSTANDARD2_1_OR_GREATER || NET47_OR_GREATER || NETCOREAPP1_1_OR_GREATER
+			= UnmanagedType.LPUTF8Str;
+#else
+			= UnmanagedType.LPStr; // presumably this will produce mojibake for non-ASCII text but is otherwise safe? CPP confirmed it was the right one so I'm trusting him --yoshi
+#endif
 
 		public enum rc_error_t : int
 		{
@@ -56,7 +62,10 @@ namespace BizHawk.Client.EmuHawk
 			RC_NO_RESPONSE = -32,
 			RC_ACCESS_DENIED = -33,
 			RC_INVALID_CREDENTIALS = -34,
-			RC_EXPIRED_TOKEN = -35
+			RC_EXPIRED_TOKEN = -35,
+			RC_INSUFFICIENT_BUFFER = -36,
+			RC_INVALID_VARIABLE_NAME = -37,
+			RC_UNKNOWN_VARIABLE_NAME = -38
 		}
 
 		public enum rc_runtime_event_type_t : byte
@@ -148,11 +157,11 @@ namespace BizHawk.Client.EmuHawk
 			IntPtr hardcore_unlocks, IntPtr unlocks, uint num_hardcore_unlocks, uint num_unlocks, long server_now, rc_api_response_t response);
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_fetch_user_unlocks_request_t(string username, string api_token, uint game_id, bool hardcore)
+		public readonly struct rc_api_fetch_user_unlocks_request_t(string username, string api_token, uint game_id, bool hardcore)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token;
 			public readonly uint game_id = game_id;
 			[MarshalAs(UnmanagedType.Bool)]
@@ -160,25 +169,25 @@ namespace BizHawk.Client.EmuHawk
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_login_request_t(string username, string api_token, string password)
+		public readonly struct rc_api_login_request_t(string username, string api_token, string password)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string password = password;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_start_session_request_t(string username, string api_token, uint game_id, string game_hash, bool hardcore)
+		public readonly struct rc_api_start_session_request_t(string username, string api_token, uint game_id, string game_hash, bool hardcore)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token;
 			public readonly uint game_id = game_id;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string game_hash = game_hash;
 			[MarshalAs(UnmanagedType.Bool)]
 			public readonly bool hardcore = hardcore;
@@ -233,75 +242,77 @@ namespace BizHawk.Client.EmuHawk
 			int submitted_score, int best_score, uint new_rank, uint num_entries, IntPtr top_entries, uint num_top_entries, rc_api_response_t response);
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_award_achievement_request_t(string username, string api_token, uint achievement_id, bool hardcore, string game_hash)
+		public readonly struct rc_api_award_achievement_request_t(string username, string api_token, uint achievement_id, bool hardcore, string game_hash, uint seconds_since_unlock)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token;
 			public readonly uint achievement_id = achievement_id;
 			[MarshalAs(UnmanagedType.Bool)]
 			public readonly bool hardcore = hardcore;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string game_hash = game_hash;
+			public readonly uint seconds_since_unlock = seconds_since_unlock;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_fetch_game_data_request_t(string username, string api_token, uint game_id)
+		public readonly struct rc_api_fetch_game_data_request_t(string username, string api_token, uint game_id)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token;
 			public readonly uint game_id = game_id;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_fetch_image_request_t(string image_name, rc_api_image_type_t image_type)
+		public readonly struct rc_api_fetch_image_request_t(string image_name, rc_api_image_type_t image_type)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string image_name = image_name;
 			public readonly rc_api_image_type_t image_type = image_type;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_ping_request_t(string username, string api_token, uint game_id, string rich_presence, string game_hash, bool hardcore)
+		public readonly struct rc_api_ping_request_t(string username, string api_token, uint game_id, string rich_presence, string game_hash, bool hardcore)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token;
 			public readonly uint game_id = game_id;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string rich_presence = rich_presence;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string game_hash = game_hash;
 			[MarshalAs(UnmanagedType.Bool)]
 			public readonly bool hardcore = hardcore;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_resolve_hash_request_t(string username, string api_token, string game_hash)
+		public readonly struct rc_api_resolve_hash_request_t(string username, string api_token, string game_hash)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username; // note: not actually used
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token; // note: not actually used
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string game_hash = game_hash;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
-		public readonly record struct rc_api_submit_lboard_entry_request_t(string username, string api_token, uint leaderboard_id, int score, string game_hash)
+		public readonly struct rc_api_submit_lboard_entry_request_t(string username, string api_token, uint leaderboard_id, int score, string game_hash, uint seconds_since_completion)
 		{
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string username = username;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string api_token = api_token;
 			public readonly uint leaderboard_id = leaderboard_id;
 			public readonly int score = score;
-			[MarshalAs(UnmanagedType.LPUTF8Str)]
+			[MarshalAs(STR_MARSHAL_HINT)]
 			public readonly string game_hash = game_hash;
+			public readonly uint seconds_since_completion = seconds_since_completion;
 		}
 
 		[StructLayout(LayoutKind.Sequential)]
@@ -313,7 +324,7 @@ namespace BizHawk.Client.EmuHawk
 			rc_hash_filereader.rc_hash_filereader_close_file_handler close)
 		{
 			[UnmanagedFunctionPointer(cc)]
-			public delegate IntPtr rc_hash_filereader_open_file_handler([MarshalAs(UnmanagedType.LPUTF8Str)] string path_utf8);
+			public delegate IntPtr rc_hash_filereader_open_file_handler([MarshalAs(STR_MARSHAL_HINT)] string path_utf8);
 
 			[UnmanagedFunctionPointer(cc)]
 			public delegate void rc_hash_filereader_seek_handler(IntPtr file_handle, long offset, SeekOrigin origin);
@@ -336,7 +347,7 @@ namespace BizHawk.Client.EmuHawk
 			rc_hash_cdreader.rc_hash_cdreader_first_track_sector_handler first_track_sector)
 		{
 			[UnmanagedFunctionPointer(cc)]
-			public delegate IntPtr rc_hash_cdreader_open_track_handler([MarshalAs(UnmanagedType.LPUTF8Str)] string path, int track);
+			public delegate IntPtr rc_hash_cdreader_open_track_handler([MarshalAs(STR_MARSHAL_HINT)] string path, int track);
 
 			[UnmanagedFunctionPointer(cc)]
 			public delegate nuint rc_hash_cdreader_read_sector_handler(IntPtr track_handle, uint sector, IntPtr buffer, nuint requested_bytes);
@@ -359,7 +370,7 @@ namespace BizHawk.Client.EmuHawk
 		public delegate bool rc_runtime_validate_address_t(uint address);
 
 		[UnmanagedFunctionPointer(cc)]
-		public delegate void rc_hash_message_callback([MarshalAs(UnmanagedType.LPUTF8Str)] string message);
+		public delegate void rc_hash_message_callback([MarshalAs(STR_MARSHAL_HINT)] string message);
 
 		[UnmanagedFunctionPointer(cc)]
 		[return: MarshalAs(UnmanagedType.Bool)]
@@ -391,10 +402,10 @@ namespace BizHawk.Client.EmuHawk
 		public abstract rc_error_t rc_runtime_progress_size(IntPtr runtime, IntPtr unused);
 
 		[BizImport(cc)]
-		public abstract void rc_runtime_serialize_progress(byte[] buffer, IntPtr runtime, IntPtr unused);
+		public abstract void rc_runtime_serialize_progress_sized(byte[] buffer, uint buffer_size, IntPtr runtime, IntPtr unused);
 
 		[BizImport(cc)]
-		public abstract rc_error_t rc_runtime_deserialize_progress(IntPtr runtime, byte[] serialized, IntPtr unused);
+		public abstract rc_error_t rc_runtime_deserialize_progress_sized(IntPtr runtime, byte[] serialized, uint serialized_size, IntPtr unused);
 
 		[BizImport(cc)]
 		public abstract void rc_runtime_validate_addresses(IntPtr runtime, rc_runtime_event_handler_t event_handler, rc_runtime_validate_address_t validate_handler);

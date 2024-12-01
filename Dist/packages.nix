@@ -16,6 +16,8 @@
 # makedeps
 , git
 # rundeps
+, gnome-themes-extra
+, gtk2-x11
 , libgdiplus
 , libGL
 , lua
@@ -28,10 +30,10 @@
 # other parameters
 , buildConfig
 , doCheck
-, emuhawkBuildFlavour
 , extraDefines
 , extraDotnetBuildFlags
 }: let
+	getMainOutput = lib.getOutput "out";
 	/** to override just one, you'll probably want to manually import packages-managed.nix, and combine that with the output of this */
 	buildExtraManagedDepsFor = hawkSourceInfo: let
 		pm = import ./packages-managed.nix {
@@ -63,14 +65,15 @@
 		'';
 		dontFixup = true;
 	};
-	genDepsHostTargetFor = { hawkSourceInfo, mono' ? mono }: [
-		(lib.getOutput "out" libgdiplus)
+	genDepsHostTargetFor = { hawkSourceInfo, gtk2-x11' ? getMainOutput gtk2-x11, mono' ? mono }: [
+		gtk2-x11'
+		(getMainOutput libgdiplus)
 		lua
 		mono'
 		openal
-		(lib.getOutput "out" zstd)
-	] ++ lib.optionals hawkSourceInfo.needsSDL [ SDL2 (lib.getOutput "out" udev) ]
-		++ lib.optional hawkSourceInfo.needsLibGLVND (lib.getOutput "out" libGL);
+		(getMainOutput zstd)
+	] ++ lib.optionals hawkSourceInfo.needsSDL [ SDL2 (getMainOutput udev) ]
+		++ lib.optional hawkSourceInfo.needsLibGLVND (getMainOutput libGL);
 	/**
 	 * see splitReleaseArtifact re: outputs
 	 * and no you can't build only DiscoHawk and its deps; deal with it
@@ -79,7 +82,7 @@
 		hawkSourceInfo = populateHawkSourceInfo hawkSourceInfo';
 		extraManagedDeps = hawkSourceInfo.extraManagedDeps or buildExtraManagedDepsFor hawkSourceInfo;
 	in buildDotnetModule (lib.fix (finalAttrs: { # proper `finalAttrs` not supported >:(
-		inherit doCheck mono;
+		inherit doCheck gnome-themes-extra mono;
 		inherit (hawkSourceInfo) __contentAddressed dotnet-sdk nugetDeps src version;
 		pname = "BizHawk";
 		isLocalBuild = lib.hasSuffix "-local" finalAttrs.version;
@@ -87,14 +90,17 @@
 		outputs = [ "out" "assets" "extraUnmanagedDeps" "waterboxCores" ];
 		propagatedBuildOutputs = []; # without this, other outputs depend on `out`
 		strictDeps = true;
-		nativeBuildInputs = lib.optional finalAttrs.isLocalBuild git;
+		nativeBuildInputs = lib.optional finalAttrs.doCheck finalAttrs.mono
+			++ lib.optional finalAttrs.isLocalBuild git;
+		gtk2-x11 = getMainOutput gtk2-x11;
 		buildInputs = genDepsHostTargetFor {
 			inherit hawkSourceInfo;
+			gtk2-x11' = finalAttrs.gtk2-x11;
 			mono' = finalAttrs.mono;
 		};
 		patches = lib.optional (!hawkSourceInfo.hasMiscTypeCheckerPatch_6afb3be98) (fetchpatch {
 			url = "https://github.com/TASEmulators/BizHawk/commit/6afb3be98cd3d8bf111c8e61fdc29fc3136aab1e.patch";
-			hash = "sha256-xZeZS939i5XZh1VgTGqXL1wPcpgYWINoskrXQfIPw5M=";
+			hash = "sha512-WpLGbng7TkEHU6wWBfk0ogDkK7Ub9Zh5PKkIQZkXDrERkEtQKrdTOOYGhswFEfJ0W4Je5hl5iZ6Ona140BxhhA==";
 		});
 		postPatch = ''
 			sed -e 's/SimpleSubshell("uname", "-r", [^)]\+)/"${builtins.toString stdenv.hostPlatform.uname.release}"/' \
@@ -110,7 +116,8 @@
 		buildType = buildConfig; #TODO move debug symbols to `!debug`?
 		extraDotnetBuildFlags = let
 			s = lib.optionalString (extraDefines != "") "-p:MachineExtraCompilationFlag=${extraDefines} ";
-		in "-maxcpucount:$NIX_BUILD_CORES -p:BuildInParallel=true --no-restore -v normal -p:ContinuousIntegrationBuild=true ${s}${extraDotnetBuildFlags}";
+		in "-maxcpucount:$NIX_BUILD_CORES -p:BuildInParallel=true --no-restore -v normal -p:ContinuousIntegrationBuild=true"
+			+ " -p:DebugType=portable ${s}${extraDotnetBuildFlags}";
 		buildPhase = ''
 			runHook preBuild
 
@@ -122,7 +129,7 @@
 
 			runHook postBuild
 		'';
-		checkNativeInputs = finalAttrs.buildInputs;
+		checkNativeInputs = finalAttrs.buildInputs; # doesn't work???
 		checkPhase = ''
 			runHook preCheck
 
@@ -131,7 +138,7 @@
 			'' else ""}Dist/BuildTest${finalAttrs.buildType}.sh ${finalAttrs.extraDotnetBuildFlags}
 
 			# can't build w/ extra Analyzers, it fails to restore :(
-#			Dist/Build${finalAttrs.buildType}.sh -p:MachineRunAnalyzersDuringBuild=true ${finalAttrs.extraDotnetBuildFlags}
+			Dist/Build${finalAttrs.buildType}.sh -p:MachineRunAnalyzersDuringBuild=true ${finalAttrs.extraDotnetBuildFlags}
 
 			runHook postCheck
 		'';
@@ -161,7 +168,7 @@
 			'' else ""}mkdir -p $out; cp -avt $out packaged_output/*.exe* packaged_output/dll
 			mv -t $out/dll $assets/dll/*
 			mv -t $out $assets/defctrl.json $assets/gamedb $assets/Shaders
-			printf '${emuhawkBuildFlavour}' >$out/dll/custombuild.txt
+			printf '${hawkSourceInfo.frontendPackageFlavour}' >$out/dll/custombuild.txt
 
 			runHook postInstall
 		'';
@@ -169,7 +176,7 @@
 		passthru = {
 			inherit extraManagedDeps # could use this to backport changes to ExternalProjects? IDK
 				hawkSourceInfo; # simple way to override `nugetDeps` for patching: `buildAssembliesFor (bizhawkAssemblies-latest.hawkSourceInfo // { nugetDeps = /*...*/; })`
-			inherit (finalAttrs) mono;
+			inherit (finalAttrs) gnome-themes-extra mono;
 #			extraUnmanagedDeps = buildUnmanagedDepsFor hawkSourceInfo; # this will override the output of the same name, example: `buildEmuHawkInstallableFor { bizhawkAssemblies = bizhawkAssemblies-latest // { extraUnmanagedDeps = /*...*/; }; }`
 			# can similarly override `assets` output, only used by launch script to populate `BIZHAWK_DATA_HOME` if the dir doesn't exist at runtime,
 			# and `waterboxCores` output, which holds just the Waterbox cores, as the name suggests
@@ -226,6 +233,7 @@
 #					(p.isWindows // p.isx86_64)
 				];
 				badPlatforms = [ p.isDarwin p.isAarch64 p.isx86_32 ];
+				mainProgram = exeName;
 			};
 		};
 	buildInstallable' =
@@ -270,7 +278,7 @@ in {
 			buildInputs = genDepsHostTargetFor { hawkSourceInfo = hawkSourceInfo'; }; # is using `buildInputs` like this correct? it's necessary because the launch script reads from it
 			outputs = [ "out" "assets" "extraUnmanagedDeps" "waterboxCores" ];
 			passthru = {
-				inherit mono;
+				inherit gnome-themes-extra mono;
 				hawkSourceInfo = hawkSourceInfo';
 			};
 			meta.sourceProvenance = [ lib.sourceTypes.binaryNativeCode lib.sourceTypes.binaryBytecode ];
@@ -284,10 +292,10 @@ in {
 			mkdir -p ExternalTools; touch ExternalTools/.keep
 
 			mkdir -p $out; mv -t $out defctrl.json DiscoHawk.exe* dll EmuHawk.exe* gamedb [Ss]haders
-			${if hawkSourceInfo'.releaseArtifactNeedsVBDotnetReference then ''cp -t $out/dll '${lib.getOutput "out" monoBasic}/usr/lib/mono/4.5/Microsoft.VisualBasic.dll'
+			${if hawkSourceInfo'.releaseArtifactNeedsVBDotnetReference then ''cp -t $out/dll '${getMainOutput monoBasic}/usr/lib/mono/4.5/Microsoft.VisualBasic.dll'
 			'' else ""}${if hawkSourceInfo'.releaseArtifactNeedsLowercaseAsms then ''(cd $out/dll; for s in Client.Common Emulation.Cores; do cp BizHawk.$s.dll Bizhawk.$s.dll; done)
 			'' else ""}${if hawkSourceInfo'.releaseArtifactNeedsOTKAsmConfig then ''cp -t $out/dll '${releaseTagSourceInfos.info-2_6.src}/Assets/dll/OpenTK.dll.config'
-			'' else ""}printf '${emuhawkBuildFlavour}' >$out/dll/custombuild.txt
+			'' else ""}printf '${hawkSourceInfo'.frontendPackageFlavour}' >$out/dll/custombuild.txt
 
 			mkdir -p $extraUnmanagedDeps/lib; mv -t $extraUnmanagedDeps/lib $out/dll/*.so*
 			mkdir -p $waterboxCores/dll; mv -t $waterboxCores/dll $out/dll/*.wbx*

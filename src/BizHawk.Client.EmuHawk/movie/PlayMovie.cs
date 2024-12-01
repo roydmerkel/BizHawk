@@ -1,4 +1,3 @@
-﻿using System;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -102,7 +101,7 @@ namespace BizHawk.Client.EmuHawk
 			var indices = MovieView.SelectedIndices;
 			if (indices.Count > 0) // Import file if necessary
 			{
-				var movie = _movieSession.Get(_movieList[MovieView.SelectedIndices[0]].Filename);
+				var movie = _movieSession.Get(_movieList[MovieView.SelectedIndices[0]].Filename, true);
 				_mainForm.StartNewMovie(movie, false);
 			}
 		}
@@ -164,7 +163,7 @@ namespace BizHawk.Client.EmuHawk
 
 				// Don't do this from browse
 				if (movie.Hash == _game.Hash
-					|| _config.PlayMovieMatchHash == false || force)
+					|| !_config.PlayMovieMatchHash || force)
 				{
 					return movie;
 				}
@@ -423,7 +422,7 @@ namespace BizHawk.Client.EmuHawk
 						}
 						break;
 					case HeaderKeys.VsyncAttoseconds:
-						if (_emulator is MAME mame && mame.VsyncAttoseconds != Convert.ToInt64(v))
+						if (_emulator is MAME mame && mame.VsyncAttoseconds != long.Parse(v))
 						{
 							item.BackColor = Color.Pink;
 							item.ToolTipText = $"Expected: {v}\n Actual: {mame.VsyncAttoseconds}";
@@ -523,10 +522,8 @@ namespace BizHawk.Client.EmuHawk
 			if (indices.Count > 0)
 			{
 				// TODO this will allocate unnecessary memory when this movie is a TasMovie due to TasStateManager
-				var movie = _movieSession.Get(_movieList[MovieView.SelectedIndices[0]].Filename);
-				movie.Load();
-				// TODO movie should be disposed if movie is ITasMovie
-				var form = new EditCommentsForm(movie, _movieSession.ReadOnly);
+				var movie = _movieSession.Get(_movieList[MovieView.SelectedIndices[0]].Filename, true);
+				var form = new EditCommentsForm(movie, readOnly: false, disposeOnClose: true);
 				form.Show();
 			}
 		}
@@ -537,11 +534,9 @@ namespace BizHawk.Client.EmuHawk
 			if (indices.Count > 0)
 			{
 				// TODO this will allocate unnecessary memory when this movie is a TasMovie due to TasStateManager
-				var movie = _movieSession.Get(_movieList[MovieView.SelectedIndices[0]].Filename);
-				movie.Load();
-				// TODO movie should be disposed if movie is ITasMovie
-				using EditSubtitlesForm s = new(DialogController, movie, _config.PathEntries, readOnly: true);
-				s.Show();
+				var movie = _movieSession.Get(_movieList[MovieView.SelectedIndices[0]].Filename, true);
+				var form = new EditSubtitlesForm(DialogController, movie, _config.PathEntries, readOnly: false, disposeOnClose: true);
+				form.Show();
 			}
 		}
 
@@ -615,7 +610,7 @@ namespace BizHawk.Client.EmuHawk
 		{
 			if (!_programmaticallyChangingStopFrameCheckbox)
 			{
-				StopOnFrameTextBox.Focus();
+				StopOnFrameTextBox.Select();
 			}
 		}
 

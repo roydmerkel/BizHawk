@@ -1,4 +1,3 @@
-﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -11,7 +10,6 @@ using System.Windows.Forms;
 using BizHawk.Common;
 using BizHawk.Common.NumberExtensions;
 using BizHawk.Common.StringExtensions;
-using BizHawk.Common.IOExtensions;
 using BizHawk.Emulation.Common;
 using BizHawk.Client.Common;
 using BizHawk.Client.EmuHawk.Properties;
@@ -111,7 +109,6 @@ namespace BizHawk.Client.EmuHawk
 
 		private string _findStr = "";
 		private bool _mouseIsDown;
-		private byte[] _rom;
 		private MemoryDomain _romDomain;
 		private HexFind _hexFind;
 		private string _lastRom = "";
@@ -143,7 +140,8 @@ namespace BizHawk.Client.EmuHawk
 
 		private WatchSize WatchSize => (WatchSize)DataSize;
 
-		private readonly Pen _blackPen = new Pen(Color.Black);
+		private readonly Pen _blackPen = Pens.Black;
+
 		private SolidBrush _freezeBrush;
 		private SolidBrush _freezeHighlightBrush;
 		private SolidBrush _highlightBrush;
@@ -232,24 +230,26 @@ namespace BizHawk.Client.EmuHawk
 
 		public override void Restart()
 		{
+			_romDomain = null;
 			if (Emulator.SystemId is not VSystemID.Raw.Arcade)
 			{
-				_rom = GetRomBytes();
-				_romDomain = new MemoryDomainByteArray(ROM_DOMAIN_NAME, MemoryDomain.Endian.Little, _rom, writable: true, wordSize: 1);
-
-				if (_domain.Name == _romDomain.Name)
+				var rom = GetRomBytes();
+				if (rom is not null)
 				{
-					_domain = _romDomain;
+					_romDomain = new MemoryDomainByteArray(ROM_DOMAIN_NAME, MemoryDomain.Endian.Little, rom, writable: true, wordSize: 1);
 				}
 			}
-			else
+
+			if (_domain.Name == ROM_DOMAIN_NAME && _romDomain is not null)
 			{
-				_romDomain = null;
+				_domain = _romDomain;
 			}
-			
-			_domain = MemoryDomains.Any(x => x.Name == _domain.Name)
-				? MemoryDomains[_domain.Name]
-				: MemoryDomains.MainMemory;
+			else
+			{ 
+				_domain = MemoryDomains.Any(x => x.Name == _domain.Name)
+					? MemoryDomains[_domain.Name]
+					: MemoryDomains.MainMemory;
+			}
 
 			BigEndian = _domain.EndianType == MemoryDomain.Endian.Big;
 
@@ -353,7 +353,7 @@ namespace BizHawk.Client.EmuHawk
 				GoToAddress(found);
 				_findStr = search;
 			}
-			else if (wrap == false)
+			else if (!wrap)
 			{
 				FindPrev(value, true); // Search the opposite direction if not found
 			}
@@ -400,7 +400,7 @@ namespace BizHawk.Client.EmuHawk
 				GoToAddress(found);
 				_findStr = search;
 			}
-			else if (wrap == false)
+			else if (!wrap)
 			{
 				FindPrev(value, true); // Search the opposite direction if not found
 			}
@@ -458,23 +458,24 @@ namespace BizHawk.Client.EmuHawk
 			var path = MainForm.CurrentlyOpenRomArgs.OpenAdvanced.SimplePath;
 			if (string.IsNullOrEmpty(path))
 			{
-				return new byte[] { 0xFF };
-			}
-
-			using var file = new HawkFile(path);
-
-			if (!file.Exists)
-			{
 				return null;
 			}
 
-			if (file.IsArchive)
+			try
 			{
-				var stream = file.GetStream();
-				return stream.ReadAllBytes();
+				using var file = new HawkFile(path);
+				if (file.Exists)
+				{
+					return file.ReadAllBytes();
+				}
+			}
+			catch (Exception ex)
+			{
+				using var exceptionBox = new ExceptionBox(ex);
+				this.ShowDialogWithTempMute(exceptionBox);
 			}
 
-			return File.ReadAllBytes(path);
+			return null;
 		}
 
 		private static int GetNumDigits(long i)
@@ -854,6 +855,7 @@ namespace BizHawk.Client.EmuHawk
 				return;
 			}
 
+			var cheats = new List<Cheat>();
 			if (_highlightedAddress >= 0)
 			{
 				var watch = Watch.GenerateWatch(
@@ -863,14 +865,13 @@ namespace BizHawk.Client.EmuHawk
 					Common.WatchDisplayType.Hex,
 					BigEndian);
 
-				MainForm.CheatList.Add(new Cheat(
+				cheats.Add(new Cheat(
 					watch,
 					watch.Value));
 			}
 
 			if (_secondaryHighlightedAddresses.Any())
 			{
-				var cheats = new List<Cheat>();
 				foreach (var address in _secondaryHighlightedAddresses)
 				{
 					var watch = Watch.GenerateWatch(
@@ -884,9 +885,9 @@ namespace BizHawk.Client.EmuHawk
 						watch,
 						watch.Value));
 				}
-
-				MainForm.CheatList.AddRange(cheats);
 			}
+
+			MainForm.CheatList.AddRange(cheats);
 
 			MemoryViewerBox.Refresh();
 		}
@@ -1395,10 +1396,7 @@ namespace BizHawk.Client.EmuHawk
 			}
 
 			// and add HighlightedAddress if present
-			if (_highlightedAddress.HasValue)
-			{
-				addresses[^1] = _highlightedAddress.Value;
-			}
+			if (_highlightedAddress is long l) addresses[addresses.Length - 1] = l;
 
 			// these need to be sorted. it's not just for HighlightedAddress, _secondaryHighlightedAddresses can even be jumbled
 			Array.Sort(addresses);
@@ -1503,7 +1501,7 @@ namespace BizHawk.Client.EmuHawk
 			else
 			{
 				_hexFind.InitialValue = _findStr;
-				_hexFind.Focus();
+				_hexFind.Activate();
 			}
 		}
 
@@ -1578,7 +1576,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void BigEndianMenuItem_Click(object sender, EventArgs e)
 		{
-			BigEndian ^= true;
+			BigEndian = !BigEndian;
 			GeneralUpdate();
 		}
 
@@ -1641,7 +1639,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void UnfreezeAllMenuItem_Click(object sender, EventArgs e)
 		{
-			MainForm.CheatList.RemoveAll();
+			MainForm.CheatList.Clear();
 		}
 
 		private void PokeAddressMenuItem_Click(object sender, EventArgs e)
@@ -1887,7 +1885,7 @@ namespace BizHawk.Client.EmuHawk
 				case Keys.Delete:
 					if (e.Modifiers == Keys.Shift)
 					{
-						MainForm.CheatList.RemoveAll();
+						MainForm.CheatList.Clear();
 					}
 					else
 					{

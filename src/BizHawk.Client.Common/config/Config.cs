@@ -1,9 +1,10 @@
-﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 
-using BizHawk.Bizware.BizwareGL;
+using BizHawk.Bizware.Graphics;
 using BizHawk.Common;
+using BizHawk.Common.CollectionExtensions;
 using BizHawk.Common.PathExtensions;
 using BizHawk.Emulation.Common;
 using BizHawk.Emulation.Cores;
@@ -18,31 +19,51 @@ namespace BizHawk.Client.Common
 		public static string ControlDefaultPath => Path.Combine(PathUtils.ExeDirectoryPath, "defctrl.json");
 
 		/// <remarks>
-		/// <c>AppliesTo[0]</c> is used as the group label, and
-		/// <c>Config.PreferredCores[AppliesTo[0]]</c> (lookup on global <see cref="Config"/> instance) determines the currently selected option.
-		/// The tuples' order determines the order of menu items.
+		/// <c>CoreNames[0]</c> is the default (out-of-the-box) core.<br/>
+		/// <c>AppliesTo</c> are concatenated to make the submenu's label, and
+		/// <c>Config.PreferredCores[AppliesTo[0]]</c> (lookup on global <see cref="Config"/> instance) determines which option is shown as checked.<br/>
+		/// The order within submenus and the order of the submenus themselves are determined by the declaration order here.
 		/// </remarks>
 		public static readonly IReadOnlyList<(string[] AppliesTo, string[] CoreNames)> CorePickerUIData = new List<(string[], string[])>
 		{
-			(new[] { VSystemID.Raw.NES },
-				new[] { CoreNames.QuickNes, CoreNames.NesHawk, CoreNames.SubNesHawk }),
-			(new[] { VSystemID.Raw.SNES },
-				new[] { CoreNames.Faust, CoreNames.Snes9X, CoreNames.Bsnes, CoreNames.Bsnes115, CoreNames.SubBsnes115 }),
-			(new[] { VSystemID.Raw.N64 },
-				new[] { CoreNames.Mupen64Plus, CoreNames.Ares64 }),
-			(new[] { VSystemID.Raw.SGB },
-				new[] { CoreNames.Gambatte, CoreNames.Bsnes, CoreNames.Bsnes115, CoreNames.SubBsnes115 }),
-			(new[] { VSystemID.Raw.GB, VSystemID.Raw.GBC },
-				new[] { CoreNames.Gambatte, CoreNames.Sameboy, CoreNames.GbHawk, CoreNames.SubGbHawk }),
-			(new[] { VSystemID.Raw.GBL },
-				new[] { CoreNames.GambatteLink, CoreNames.GBHawkLink, CoreNames.GBHawkLink3x, CoreNames.GBHawkLink4x }),
-			(new[] { VSystemID.Raw.PCE, VSystemID.Raw.PCECD, VSystemID.Raw.SGX, VSystemID.Raw.SGXCD },
-				new[] { CoreNames.TurboNyma, CoreNames.HyperNyma, CoreNames.PceHawk }),
-			(new[] { VSystemID.Raw.PSX },
-				new[] { CoreNames.Octoshock, CoreNames.Nymashock }),
-			(new[] { VSystemID.Raw.TI83 },
-				new[] { CoreNames.TI83Hawk, CoreNames.Emu83 }),
+			([ VSystemID.Raw.A26 ],
+				[ CoreNames.Atari2600Hawk, CoreNames.Stella ]),
+			([ VSystemID.Raw.Satellaview ],
+				[ CoreNames.Bsnes115, CoreNames.SubBsnes115 ]),
+			([ VSystemID.Raw.GB, VSystemID.Raw.GBC ],
+				[ CoreNames.Gambatte, CoreNames.Sameboy, CoreNames.GbHawk, CoreNames.SubGbHawk ]),
+			([ VSystemID.Raw.GBL ],
+				[ CoreNames.GambatteLink, CoreNames.GBHawkLink, CoreNames.GBHawkLink3x, CoreNames.GBHawkLink4x ]),
+			([ VSystemID.Raw.SGB ],
+				[ CoreNames.Gambatte, CoreNames.Bsnes115, CoreNames.SubBsnes115, CoreNames.Bsnes ]),
+			([ VSystemID.Raw.GEN ],
+				[ CoreNames.Gpgx, CoreNames.PicoDrive ]),
+			([ VSystemID.Raw.N64 ],
+				[ CoreNames.Mupen64Plus, CoreNames.Ares64 ]),
+			([ VSystemID.Raw.NES ],
+				[ CoreNames.QuickNes, CoreNames.NesHawk, CoreNames.SubNesHawk ]),
+			([ VSystemID.Raw.PCE, VSystemID.Raw.PCECD, VSystemID.Raw.SGX, VSystemID.Raw.SGXCD ],
+				[ CoreNames.TurboNyma, CoreNames.HyperNyma, CoreNames.PceHawk ]),
+			([ VSystemID.Raw.PSX ],
+				[ CoreNames.Nymashock, CoreNames.Octoshock ]),
+			([ VSystemID.Raw.SMS, VSystemID.Raw.GG, VSystemID.Raw.SG ],
+				[ CoreNames.Gpgx, CoreNames.SMSHawk ]),
+			([ VSystemID.Raw.SNES ],
+				[ CoreNames.Snes9X, CoreNames.Bsnes115, CoreNames.SubBsnes115, CoreNames.Faust, CoreNames.Bsnes ]),
+			([ VSystemID.Raw.TI83 ],
+				[ CoreNames.Emu83, CoreNames.TI83Hawk ]),
 		};
+
+		public static Dictionary<string, string> GenDefaultCorePreferences()
+		{
+			Dictionary<string, string> dict = new();
+			foreach (var (appliesTo, coreNames) in CorePickerUIData)
+			{
+				var defaultCore = coreNames[0];
+				foreach (var sysID in appliesTo) dict[sysID] = defaultCore;
+			}
+			return dict;
+		}
 
 		public Config()
 		{
@@ -92,7 +113,20 @@ namespace BizHawk.Client.Common
 
 		public bool StackOSDMessages { get; set; } = true;
 
-		public ZoomFactors TargetZoomFactors { get; set; } = new ZoomFactors();
+		private Dictionary<string, int> TargetZoomFactors { get; set; } = new()
+		{
+			[VSystemID.Raw.GB] = 3,
+			[VSystemID.Raw.GBA] = 3,
+			[VSystemID.Raw.GBC] = 3,
+			[VSystemID.Raw.N64] = 1,
+			[VSystemID.Raw.WSWAN] = 3,
+		};
+
+		public int GetWindowScaleFor(string sysID)
+			=> TargetZoomFactors.GetValueOrPut(sysID, static _ => 2);
+
+		public void SetWindowScaleFor(string sysID, int windowScale)
+			=> TargetZoomFactors[sysID] = windowScale;
 
 		// choose between 0 and 256
 		public int TargetScanlineFilterIntensity { get; set; } = 128;
@@ -105,8 +139,9 @@ namespace BizHawk.Client.Common
 		public bool MainFormStayOnTop { get; set; }
 		public bool StartPaused { get; set; }
 		public bool StartFullscreen { get; set; }
-		public int MainWndx { get; set; } = -1; // Negative numbers will be ignored
-		public int MainWndy { get; set; } = -1;
+		public Point? MainWindowPosition { get; set; }
+		public Size? MainWindowSize { get; set; }
+		public bool MainWindowMaximized { get; set; }
 		public bool RunInBackground { get; set; } = true;
 		public bool AcceptBackgroundInput { get; set; }
 		public bool AcceptBackgroundInputControllerOnly { get; set; }
@@ -129,7 +164,7 @@ namespace BizHawk.Client.Common
 		public bool AviCaptureLua { get; set; }
 		public bool ScreenshotCaptureOsd { get; set; }
 		public bool FirstBoot { get; set; } = true;
-		public bool UpdateAutoCheckEnabled { get; set; }
+		public bool UpdateAutoCheckEnabled { get; set; } = true;
 		public DateTime? UpdateLastCheckTimeUtc { get; set; }
 		public string UpdateLatestVersion { get; set; } = "";
 		public string UpdateIgnoreVersion { get; set; } = "";
@@ -182,9 +217,9 @@ namespace BizHawk.Client.Common
 		public bool VSync { get; set; }
 
 		/// <summary>
-		/// Tries to use an alternate vsync mechanism, for video cards that just can't do it right
+		/// Allows non-vsync'd video to tear, this is needed for VFR monitors reportedly
 		/// </summary>
-		public bool DispAlternateVsync { get; set; }
+		public bool DispAllowTearing { get; set; }
 
 		// Display options
 		public bool DisplayFps { get; set; }
@@ -212,11 +247,11 @@ namespace BizHawk.Client.Common
 		public int MessagesColor { get; set; } = DefaultMessagePositions.MessagesColor;
 		public int AlertMessageColor { get; set; } = DefaultMessagePositions.AlertMessageColor;
 		public int LastInputColor { get; set; } = DefaultMessagePositions.LastInputColor;
-		public int MovieInput { get; set; } = DefaultMessagePositions.MovieInput;
+		public int MovieInputColor { get; set; } = DefaultMessagePositions.MovieInputColor;
 
 		public int DispPrescale { get; set; } = 1;
 
-		public EDispMethod DispMethod { get; set; } = HostCapabilityDetector.HasDirectX && !OSTailoredCode.IsWine ? EDispMethod.D3D9 : EDispMethod.OpenGL;
+		public EDispMethod DispMethod { get; set; } = HostCapabilityDetector.HasD3D11 && !OSTailoredCode.IsWine ? EDispMethod.D3D11 : EDispMethod.OpenGL;
 
 		public int DispChromeFrameWindowed { get; set; } = 2;
 		public bool DispChromeStatusBarWindowed { get; set; } = true;
@@ -243,14 +278,64 @@ namespace BizHawk.Client.Common
 		public int DispCropRight { get; set; } = 0;
 		public int DispCropBottom { get; set; } = 0;
 
+		/// <summary>
+		/// Automatically resize main window when framebuffer size changes (default behavior)
+		/// </summary>
+		public bool ResizeWithFramebuffer { get; set; } = true;
+
 		// Sound options
-		public ESoundOutputMethod SoundOutputMethod { get; set; } = HostCapabilityDetector.HasDirectX ? ESoundOutputMethod.DirectSound : ESoundOutputMethod.OpenAL;
+		public ESoundOutputMethod SoundOutputMethod { get; set; } = HostCapabilityDetector.HasXAudio2 ? ESoundOutputMethod.XAudio2 : ESoundOutputMethod.OpenAL;
+
+		/// <value>iff <see langword="false"/>, cores may skip processing audio</value>
+		/// <seealso cref="SoundEnabledNormal"/>
+		/// <seealso cref="SoundEnabledRWFF"/>
+		/// <seealso cref="MuteFrameAdvance"/>
 		public bool SoundEnabled { get; set; } = true;
+
+		/// <value>whether to pass audio through to the host while emulating to normal throttle</value>
+		/// <remarks>separate from <see cref="SoundVolume"/> so that the config UI can "remember" the previous value</remarks>
+		/// <seealso cref="SoundVolume"/>
+		/// <seealso cref="SoundEnabled"/>
+		/// <seealso cref="SoundEnabledRWFF"/>
+		/// <seealso cref="MuteFrameAdvance"/>
 		public bool SoundEnabledNormal { get; set; } = true;
+
+		/// <value>whether to pass audio through to the host while rewinding or fast-forwarding</value>
+		/// <remarks>separate from <see cref="SoundVolumeRWFF"/> so that the config UI can "remember" the previous value</remarks>
+		/// <seealso cref="SoundVolumeRWFF"/>
+		/// <seealso cref="SoundEnabled"/>
+		/// <seealso cref="SoundEnabledNormal"/>
+		/// <seealso cref="MuteFrameAdvance"/>
 		public bool SoundEnabledRWFF { get; set; } = true;
+
+		/// <value>whether to pass audio through to the host when doing a frame advance while paused</value>
+		/// <remarks>
+		/// sets sample amplitude multiplier to 0x iff <see langword="true"/>,
+		/// otherwise the main <see cref="SoundVolume"/> has effect
+		/// </remarks>
+		/// <seealso cref="SoundEnabled"/>
+		/// <seealso cref="SoundEnabledNormal"/>
+		/// <seealso cref="SoundEnabledRWFF"/>
 		public bool MuteFrameAdvance { get; set; } = true;
-		public int SoundVolume { get; set; } = 100; // Range 0-100
-		public int SoundVolumeRWFF { get; set; } = 50; // Range 0-100
+
+		/// <value>
+		/// volume level; interpreted as a percentage (i.e. scaled down to 0.0..1.0)
+		/// and passed to the platform audio implementation, which should use it as a simple multiplier on each sample;<br/>
+		/// so <c>0</c> is scale each sample by 0x (mute),<c>100</c> is scale each sample by 1x (preserve full volume),
+		/// <c>50</c> is scale each sample by 0.5x (≈ -3 dB), and <c>25</c> is scale each sample by 0.25x (≈ -6 dB)
+		/// </value>
+		/// <seealso cref="SoundVolumeRWFF"/>
+		/// <seealso cref="SoundEnabledNormal"/>
+		public int SoundVolume { get; set; } = 100;
+
+		/// <value>
+		/// when rewinding or fast-forwarding, the sample amplitude multiplier is <i>multiplied by this value</i>
+		/// (after conversion from percentage), or in other words, <see cref="SoundVolume"/> remains in effect
+		/// </value>
+		/// <seealso cref="SoundVolume"/>
+		/// <seealso cref="SoundEnabledRWFF"/>
+		public int SoundVolumeRWFF { get; set; } = 50;
+
 		public bool SoundThrottle { get; set; }
 		public string SoundDevice { get; set; } = "";
 		public int SoundBufferSizeMs { get; set; } = 100;
@@ -319,22 +404,7 @@ namespace BizHawk.Client.Common
 		public bool GbAsSgb { get; set; }
 		public string LibretroCore { get; set; }
 
-		public Dictionary<string, string> PreferredCores = new()
-		{
-			[VSystemID.Raw.NES] = CoreNames.QuickNes,
-			[VSystemID.Raw.SNES] = CoreNames.Snes9X,
-			[VSystemID.Raw.N64] = CoreNames.Mupen64Plus,
-			[VSystemID.Raw.GB] = CoreNames.Gambatte,
-			[VSystemID.Raw.GBC] = CoreNames.Gambatte,
-			[VSystemID.Raw.GBL] = CoreNames.GambatteLink,
-			[VSystemID.Raw.SGB] = CoreNames.Gambatte,
-			[VSystemID.Raw.PCE] = CoreNames.TurboNyma,
-			[VSystemID.Raw.PCECD] = CoreNames.TurboNyma,
-			[VSystemID.Raw.SGX] = CoreNames.TurboNyma,
-			[VSystemID.Raw.SGXCD] = CoreNames.TurboNyma,
-			[VSystemID.Raw.PSX] = CoreNames.Nymashock,
-			[VSystemID.Raw.TI83] = CoreNames.Emu83,
-		};
+		public Dictionary<string, string> PreferredCores = GenDefaultCorePreferences();
 
 		public bool DontTryOtherCores { get; set; }
 
@@ -343,8 +413,6 @@ namespace BizHawk.Client.Common
 
 		// ReSharper disable once UnusedMember.Global
 		public string LastWrittenFromDetailed { get; set; } = VersionInfo.GetEmuVersion();
-
-		public EHostInputMethod HostInputMethod { get; set; } = HostCapabilityDetector.HasDirectX ? EHostInputMethod.DirectInput : EHostInputMethod.SDL2;
 
 		public bool UseStaticWindowTitles { get; set; }
 

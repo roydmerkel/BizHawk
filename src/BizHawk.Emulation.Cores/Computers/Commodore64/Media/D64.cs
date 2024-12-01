@@ -1,4 +1,3 @@
-﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -47,22 +46,22 @@ namespace BizHawk.Emulation.Cores.Computers.Commodore64.Media
 
 		private static readonly int[] GcrEncodeTable =
 		{
-			Convert.ToByte("01010", 2), // 0
-			Convert.ToByte("01011", 2), // 1
-			Convert.ToByte("10010", 2), // 2
-			Convert.ToByte("10011", 2), // 3
-			Convert.ToByte("01110", 2), // 4
-			Convert.ToByte("01111", 2), // 5
-			Convert.ToByte("10110", 2), // 6
-			Convert.ToByte("10111", 2), // 7
-			Convert.ToByte("01001", 2), // 8
-			Convert.ToByte("11001", 2), // 9
-			Convert.ToByte("11010", 2), // A
-			Convert.ToByte("11011", 2), // B
-			Convert.ToByte("01101", 2), // C
-			Convert.ToByte("11101", 2), // D
-			Convert.ToByte("11110", 2), // E
-			Convert.ToByte("10101", 2)  // F
+			0b01010, // 0
+			0b01011, // 1
+			0b10010, // 2
+			0b10011, // 3
+			0b01110, // 4
+			0b01111, // 5
+			0b10110, // 6
+			0b10111, // 7
+			0b01001, // 8
+			0b11001, // 9
+			0b11010, // A
+			0b11011, // B
+			0b01101, // C
+			0b11101, // D
+			0b11110, // E
+			0b10101, // F
 		};
 
 		private static readonly int[] SectorsPerTrack =
@@ -125,7 +124,7 @@ namespace BizHawk.Emulation.Cores.Computers.Commodore64.Media
 
 			writer.Write(syncBytes40); // sync
 			writer.Write(EncodeGcr(new byte[] { (byte)(errorType == ErrorType.DataNotFound ? 0x00 : 0x08), headerChecksum, sectorNo, trackNo, formatA, formatB, 0x0F, 0x0F })); // header
-			writer.Write(new byte[] { 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55 }); // gap
+			writer.Write("UUUUUUUUU"u8.ToArray()); // gap
 			writer.Write(syncBytes40); // sync
 			writer.Write(EncodeGcr(writtenData)); // data
 			writer.Write(Enumerable.Repeat((byte)0x55, gapLength).ToArray()); // gap

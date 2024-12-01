@@ -1,4 +1,3 @@
-﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
@@ -192,7 +191,7 @@ namespace BizHawk.Client.EmuHawk
 				lib.APIs = _apiContainer;
 				if (!ServiceInjector.UpdateServices(newServiceProvider, lib, mayCache: true))
 				{
-					throw new("Lua lib has required service(s) that can't be fulfilled");
+					throw new Exception("Lua lib has required service(s) that can't be fulfilled");
 				}
 
 				lib.Restarted();
@@ -205,8 +204,6 @@ namespace BizHawk.Client.EmuHawk
 
 		public void CallSaveStateEvent(string name)
 		{
-			using var luaAutoUnlockHack = GuiAPI.ThisIsTheLuaAutoUnlockHack();
-
 			try
 			{
 				foreach (var lf in RegisteredFunctions.Where(static l => l.Event == NamedLuaFunction.EVENT_TYPE_SAVESTATE).ToList())
@@ -222,8 +219,6 @@ namespace BizHawk.Client.EmuHawk
 
 		public void CallLoadStateEvent(string name)
 		{
-			using var luaAutoUnlockHack = GuiAPI.ThisIsTheLuaAutoUnlockHack();
-
 			try
 			{
 				foreach (var lf in RegisteredFunctions.Where(static l => l.Event == NamedLuaFunction.EVENT_TYPE_LOADSTATE).ToList())
@@ -240,8 +235,6 @@ namespace BizHawk.Client.EmuHawk
 		public void CallFrameBeforeEvent()
 		{
 			if (IsUpdateSupressed) return;
-
-			using var luaAutoUnlockHack = GuiAPI.ThisIsTheLuaAutoUnlockHack();
 
 			try
 			{
@@ -260,8 +253,6 @@ namespace BizHawk.Client.EmuHawk
 		{
 			if (IsUpdateSupressed) return;
 
-			using var luaAutoUnlockHack = GuiAPI.ThisIsTheLuaAutoUnlockHack();
-
 			try
 			{
 				foreach (var lf in RegisteredFunctions.Where(static l => l.Event == NamedLuaFunction.EVENT_TYPE_POSTFRAME).ToList())
@@ -277,8 +268,6 @@ namespace BizHawk.Client.EmuHawk
 
 		public void CallExitEvent(LuaFile lf)
 		{
-			using var luaAutoUnlockHack = GuiAPI.ThisIsTheLuaAutoUnlockHack();
-
 			foreach (var exitCallback in RegisteredFunctions
 				.Where(l => l.Event == NamedLuaFunction.EVENT_TYPE_ENGINESTOP
 					&& (l.LuaFile.Path == lf.Path || ReferenceEquals(l.LuaFile.Thread, lf.Thread)))
@@ -334,13 +323,33 @@ namespace BizHawk.Client.EmuHawk
 		public void SpawnAndSetFileThread(string pathToLoad, LuaFile lf)
 			=> lf.Thread = SpawnCoroutine(pathToLoad);
 
-		public void ExecuteString(string command)
-			=> _lua.DoString(command);
+		public object[] ExecuteString(string command)
+		{
+			const string ChunkName = "input"; // shows up in error messages
+
+			// Use LoadString to separate parsing and execution, to tell syntax errors and runtime errors apart
+			LuaFunction func;
+			try
+			{
+				// Adding a return is necessary to get out return values of functions and turn expressions ("1+1" etc.) into valid statements
+				func = _lua.LoadString($"return {command}", ChunkName);
+			}
+			catch (Exception)
+			{
+				// command may be a valid statement without the added "return"
+				// if previous attempt couldn't be parsed, run the raw command
+				return _lua.DoString(command, ChunkName);
+			}
+
+			using (func)
+			{
+				return func.Call();
+			}
+		}
 
 		public (bool WaitForFrame, bool Terminated) ResumeScript(LuaFile lf)
 		{
 			_currThread = lf.Thread;
-			using var luaAutoUnlockHack = GuiAPI.ThisIsTheLuaAutoUnlockHack();
 
 			try
 			{

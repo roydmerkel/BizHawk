@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
@@ -173,6 +172,10 @@ namespace BizHawk.Client.EmuHawk
 			{
 				SetToFastMode();
 			}
+			else
+			{
+				SetToDetailedMode();
+			}
 
 			NewSearch();
 		}
@@ -189,7 +192,7 @@ namespace BizHawk.Client.EmuHawk
 				var nextColor = Color.White;
 				var search = _searches[index];
 				var isCheat = MainForm.CheatList.IsActive(_settings.Domain, search.Address);
-				var isWeeded = Settings.PreviewMode && !_forcePreviewClear && _searches.Preview(search.Address);
+				var isWeeded = Settings.PreviewMode && !_forcePreviewClear && _searches.Preview(index);
 
 				if (!search.IsValid)
 				{
@@ -305,6 +308,8 @@ namespace BizHawk.Client.EmuHawk
 
 		public override void Restart()
 		{
+			if (!IsHandleCreated) return;
+
 			_settings = new SearchEngineSettings(MemoryDomains, Settings.UseUndoHistory);
 			_searches = new RamSearchEngine(_settings, MemoryDomains);
 			MessageLabel.Text = "Search restarted";
@@ -419,7 +424,7 @@ namespace BizHawk.Client.EmuHawk
 					WatchListView.AnyRowsSelected && _searches.Domain.Writable;
 		}
 
-		private long? CompareToValue
+		private uint? CompareToValue
 		{
 			get
 			{
@@ -430,29 +435,29 @@ namespace BizHawk.Client.EmuHawk
 
 				if (SpecificValueRadio.Checked)
 				{
-					return (long)SpecificValueBox.ToRawInt() & 0x00000000FFFFFFFF;
+					return (uint)SpecificValueBox.ToRawInt()!.Value;
 				}
 
 				if (SpecificAddressRadio.Checked)
 				{
-					return SpecificAddressBox.ToRawInt();
+					return (uint)SpecificAddressBox.ToRawInt()!.Value;
 				}
 
 				if (NumberOfChangesRadio.Checked)
 				{
-					return NumberOfChangesBox.ToRawInt();
+					return (uint)NumberOfChangesBox.ToRawInt()!.Value;
 				}
 
 				if (DifferenceRadio.Checked)
 				{
-					return DifferenceBox.ToRawInt();
+					return (uint)DifferenceBox.ToRawInt()!.Value;
 				}
 
 				return null;
 			}
 		}
 
-		private int? DifferentByValue => DifferentByRadio.Checked ? DifferentByBox.ToRawInt() : null;
+		private uint? DifferentByValue => DifferentByRadio.Checked ? (uint?)DifferentByBox.ToRawInt() : null;
 
 		private ComparisonOperator Operator
 		{
@@ -736,7 +741,7 @@ namespace BizHawk.Client.EmuHawk
 			WatchListView.Refresh();
 		}
 
-		private void SetCompareValue(int? value)
+		private void SetCompareValue(uint? value)
 		{
 			_searches.CompareValue = value;
 			WatchListView.Refresh();
@@ -1136,7 +1141,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void CheckMisalignedMenuItem_Click(object sender, EventArgs e)
 		{
-			_settings.CheckMisAligned ^= true;
+			_settings.CheckMisAligned = !_settings.CheckMisAligned;
 			SetReboot(true);
 		}
 
@@ -1162,7 +1167,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void BigEndianMenuItem_Click(object sender, EventArgs e)
 		{
-			_settings.BigEndian ^= true;
+			_settings.BigEndian = !_settings.BigEndian;
 			_searches.SetEndian(_settings.BigEndian);
 		}
 
@@ -1286,13 +1291,11 @@ namespace BizHawk.Client.EmuHawk
 		}
 
 		private void PreviewModeMenuItem_Click(object sender, EventArgs e)
-		{
-			Settings.PreviewMode ^= true;
-		}
+			=> Settings.PreviewMode = !Settings.PreviewMode;
 
 		private void AutoSearchMenuItem_Click(object sender, EventArgs e)
 		{
-			_autoSearch ^= true;
+			_autoSearch = !_autoSearch;
 			AutoSearchCheckBox.Checked = _autoSearch;
 			DoSearchToolButton.Enabled =
 				SearchButton.Enabled =
@@ -1300,13 +1303,11 @@ namespace BizHawk.Client.EmuHawk
 		}
 
 		private void AutoSearchAccountForLagMenuItem_Click(object sender, EventArgs e)
-		{
-			Settings.AutoSearchTakeLagFramesIntoAccount ^= true;
-		}
+			=> Settings.AutoSearchTakeLagFramesIntoAccount = !Settings.AutoSearchTakeLagFramesIntoAccount;
 
 		private void ExcludeRamWatchMenuItem_Click(object sender, EventArgs e)
 		{
-			Settings.AlwaysExcludeRamWatch ^= true;
+			Settings.AlwaysExcludeRamWatch = !Settings.AlwaysExcludeRamWatch;
 			if (Settings.AlwaysExcludeRamWatch)
 			{
 				RemoveRamWatchesFromList();
@@ -1315,7 +1316,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void UseUndoHistoryMenuItem_Click(object sender, EventArgs e)
 		{
-			_searches.UndoEnabled ^= true;
+			_searches.UndoEnabled = !_searches.UndoEnabled;
 			Settings.UseUndoHistory = _searches.UndoEnabled;
 		}
 
@@ -1376,7 +1377,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void UnfreezeAllContextMenuItem_Click(object sender, EventArgs e)
 		{
-			MainForm.CheatList.RemoveAll();
+			MainForm.CheatList.Clear();
 		}
 
 		private void ViewInHexEditorContextMenuItem_Click(object sender, EventArgs e)
@@ -1463,11 +1464,11 @@ namespace BizHawk.Client.EmuHawk
 				SpecificAddressBox.ResetText();
 			}
 
-			_searches.CompareValue = SpecificValueBox.ToRawInt();
+			_searches.CompareValue = (uint?)SpecificValueBox.ToRawInt();
 
 			if (Focused)
 			{
-				SpecificValueBox.Focus();
+				SpecificValueBox.Select();
 			}
 
 			SpecificAddressBox.Enabled = false;
@@ -1485,11 +1486,11 @@ namespace BizHawk.Client.EmuHawk
 				SpecificAddressBox.ResetText();
 			}
 
-			_searches.CompareValue = SpecificAddressBox.ToRawInt();
+			_searches.CompareValue = (uint?)SpecificAddressBox.ToRawInt();
 
 			if (Focused)
 			{
-				SpecificAddressBox.Focus();
+				SpecificAddressBox.Select();
 			}
 
 			NumberOfChangesBox.Enabled = false;
@@ -1507,11 +1508,11 @@ namespace BizHawk.Client.EmuHawk
 				NumberOfChangesBox.ResetText();
 			}
 
-			_searches.CompareValue = NumberOfChangesBox.ToRawInt();
+			_searches.CompareValue = (uint?)NumberOfChangesBox.ToRawInt();
 
 			if (Focused)
 			{
-				NumberOfChangesBox.Focus();
+				NumberOfChangesBox.Select();
 			}
 
 			DifferenceBox.Enabled = false;
@@ -1529,11 +1530,11 @@ namespace BizHawk.Client.EmuHawk
 				DifferenceBox.ResetText();
 			}
 
-			_searches.CompareValue = DifferenceBox.ToRawInt();
+			_searches.CompareValue = (uint?)DifferenceBox.ToRawInt();
 
 			if (Focused)
 			{
-				DifferenceBox.Focus();
+				DifferenceBox.Select();
 			}
 
 			SetCompareTo(Compare.Difference);
@@ -1541,7 +1542,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void CompareToValue_TextChanged(object sender, EventArgs e)
 		{
-			SetCompareValue(((INumberBox)sender).ToRawInt());
+			SetCompareValue((uint?)((INumberBox)sender).ToRawInt());
 		}
 
 		private void EqualToRadio_Click(object sender, EventArgs e)
@@ -1589,11 +1590,11 @@ namespace BizHawk.Client.EmuHawk
 				DifferentByBox.ResetText();
 			}
 
-			_searches.DifferentBy = DifferenceBox.ToRawInt();
+			_searches.DifferentBy = (uint?)DifferenceBox.ToRawInt();
 
 			if (Focused)
 			{
-				DifferentByBox.Focus();
+				DifferentByBox.Select();
 			}
 
 			SetComparisonOperator(ComparisonOperator.DifferentBy);
@@ -1601,7 +1602,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void DifferentByBox_TextChanged(object sender, EventArgs e)
 		{
-			_searches.DifferentBy = !string.IsNullOrWhiteSpace(DifferentByBox.Text) ? DifferentByBox.ToRawInt() : null;
+			_searches.DifferentBy = !string.IsNullOrWhiteSpace(DifferentByBox.Text) ? (uint?)DifferentByBox.ToRawInt() : null;
 			WatchListView.Refresh();
 		}
 
@@ -1635,7 +1636,7 @@ namespace BizHawk.Client.EmuHawk
 
 		private void WatchListView_ColumnClick(object sender, InputRoll.ColumnClickEventArgs e)
 		{
-			var column = e.Column;
+			var column = e.Column!;
 			if (column.Name != _sortedColumn)
 			{
 				_sortReverse = false;
@@ -1644,7 +1645,7 @@ namespace BizHawk.Client.EmuHawk
 			_searches.Sort(column.Name, _sortReverse);
 
 			_sortedColumn = column.Name;
-			_sortReverse ^= true;
+			_sortReverse = !_sortReverse;
 			WatchListView.Refresh();
 		}
 

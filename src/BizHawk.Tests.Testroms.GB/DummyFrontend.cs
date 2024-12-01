@@ -1,10 +1,8 @@
-using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
 
-using BizHawk.Bizware.BizwareGL;
 using BizHawk.Bizware.Graphics;
 using BizHawk.Client.Common;
 using BizHawk.Common.IOExtensions;
@@ -79,38 +77,6 @@ namespace BizHawk.Tests.Testroms.GB
 				=> throw new NotImplementedException(); // only used by Encore
 		}
 
-		public sealed class SimpleGDIPDisplayManager : DisplayManagerBase
-		{
-			private SimpleGDIPDisplayManager(Config config, IEmulator emuCore, IGL_GDIPlus glImpl)
-				: base(
-					config,
-					emuCore,
-					inputManager: null,
-					movieSession: null,
-					EDispMethod.GdiPlus,
-					glImpl,
-					new GDIPlusGuiRenderer(glImpl))
-				{}
-
-			public SimpleGDIPDisplayManager(Config config, IEmulator emuCore, Func<(int Width, int Height)> getVirtualSize)
-				: this(config, emuCore, new IGL_GDIPlus()) {}
-
-			protected override void ActivateGraphicsControlContext() {}
-
-			public override void ActivateOpenGLContext() {}
-
-			protected override Size GetGraphicsControlSize()
-				=> throw new NotImplementedException();
-
-			public override Size GetPanelNativeSize()
-				=> throw new NotImplementedException();
-
-			protected override Point GraphicsControlPointToClient(Point p)
-				=> throw new NotImplementedException();
-
-			protected override void SwapBuffersOfGraphicsControl() {}
-		}
-
 		private static int _totalFrames = 0;
 
 		private static readonly object _totalFramesMutex = new();
@@ -124,7 +90,7 @@ namespace BizHawk.Tests.Testroms.GB
 		}
 
 		/// <summary>
-		/// set-up firmwares on <paramref name="efp"/>, optionally setting <paramref name="config"/>, then
+		/// set-up firmware on <paramref name="efp"/>, optionally setting <paramref name="config"/>, then
 		/// initialise and return a core instance (<paramref name="coreComm"/> is provided),
 		/// and optionally specify a frame number to seek to (e.g. to skip BIOS screens)
 		/// </summary>

@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using BizHawk.Emulation.Common;
 
@@ -7,12 +6,6 @@ namespace BizHawk.Client.Common.RamSearchEngine
 {
 	internal static class Extensions
 	{
-		public static float ToFloat(this long val)
-		{
-			var bytes = BitConverter.GetBytes((int)val);
-			return BitConverter.ToSingle(bytes, 0);
-		}
-
 		public static IEnumerable<IMiniWatch> ToBytes(this IEnumerable<long> addresses, SearchEngineSettings settings)
 			=> settings.IsDetailed()
 				? addresses.ToDetailedBytes(settings.Domain)

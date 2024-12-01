@@ -1,4 +1,3 @@
-﻿using System;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading;
@@ -27,7 +26,9 @@ namespace BizHawk.Client.EmuHawk
 
 		private readonly HashSet<Control> _wantingMouseFocus = new HashSet<Control>();
 
-		public static Input Instance { get; set; }
+#pragma warning disable CA2211 // public field
+		public static Input Instance;
+#pragma warning restore CA2211
 
 		private readonly Thread _updateThread;
 
@@ -45,13 +46,7 @@ namespace BizHawk.Client.EmuHawk
 
 			MainFormInputAllowedCallback = mainFormInputAllowedCallback;
 
-			Adapter = _currentConfig.HostInputMethod switch
-			{
-				EHostInputMethod.SDL2 => new SDL2InputAdapter(),
-				_ when OSTailoredCode.IsUnixHost => new SDL2InputAdapter(),
-				EHostInputMethod.DirectInput => new DirectInputAdapter(),
-				_ => throw new InvalidOperationException()
-			};
+			Adapter = new SDL2InputAdapter();
 			Console.WriteLine($"Using {Adapter.Desc} for host input (keyboard + gamepads)");
 			Adapter.UpdateConfig(_currentConfig);
 			Adapter.FirstInitAll(mainFormHandle);
@@ -63,9 +58,12 @@ namespace BizHawk.Client.EmuHawk
 			_updateThread.Start();
 		}
 
-		private readonly WorkingDictionary<string, bool> _lastState = new WorkingDictionary<string, bool>();
-		private readonly WorkingDictionary<string, int> _axisValues = new WorkingDictionary<string, int>();
-		private readonly WorkingDictionary<string, float> _axisDeltas = new WorkingDictionary<string, float>();
+		private readonly Dictionary<string, float> _axisDeltas = new();
+
+		private readonly Dictionary<string, int> _axisValues = new();
+
+		private readonly Dictionary<string, bool> _lastState = new();
+
 		private bool _trackDeltas;
 		private bool _ignoreEventsNextPoll;
 
@@ -104,7 +102,7 @@ namespace BizHawk.Client.EmuHawk
 			var modIndex = _currentConfig.ModifierKeysEffective.IndexOf(button1);
 			var currentModifier = modIndex is -1 ? 0U : 1U << modIndex;
 			if (EnableIgnoreModifiers && currentModifier is not 0U) return;
-			if (newState == _lastState[button1]) return;
+			if (newState == _lastState.GetValueOrDefault(button1)) return;
 
 			if (currentModifier is not 0U)
 			{
@@ -137,7 +135,14 @@ namespace BizHawk.Client.EmuHawk
 
 		private void HandleAxis(string axis, int newValue)
 		{
-			if (_trackDeltas) _axisDeltas[axis] += Math.Abs(newValue - _axisValues[axis]);
+			if (ShouldSwallow(MainFormInputAllowedCallback(false), ClientInputFocus.Pad))
+				return;
+
+			if (_trackDeltas)
+			{
+				_axisDeltas[axis] = _axisDeltas.GetValueOrDefault(axis)
+					+ Math.Abs(newValue - _axisValues.GetValueOrDefault(axis));
+			}
 			_axisValues[axis] = newValue;
 		}
 
@@ -219,8 +224,11 @@ namespace BizHawk.Client.EmuHawk
 							if (_trackDeltas)
 							{
 								// these are relative to screen coordinates, but that's not terribly important
-								_axisDeltas["WMouse X"] += Math.Abs(mousePos.X - _axisValues["WMouse X"]) * 50;
-								_axisDeltas["WMouse Y"] += Math.Abs(mousePos.Y - _axisValues["WMouse Y"]) * 50;
+								const float MOUSE_DELTA_SCALE = 50.0f;
+								_axisDeltas["WMouse X"] = _axisDeltas.GetValueOrDefault("WMouse X")
+									+ MOUSE_DELTA_SCALE * Math.Abs(mousePos.X - _axisValues.GetValueOrDefault("WMouse X"));
+								_axisDeltas["WMouse Y"] = _axisDeltas.GetValueOrDefault("WMouse Y")
+									+ MOUSE_DELTA_SCALE * Math.Abs(mousePos.Y - _axisValues.GetValueOrDefault("WMouse Y"));
 							}
 							// coordinate translation happens later
 							_axisValues["WMouse X"] = mousePos.X;
@@ -228,7 +236,7 @@ namespace BizHawk.Client.EmuHawk
 
 							var mouseBtns = Control.MouseButtons;
 							HandleButton("WMouse L", (mouseBtns & MouseButtons.Left) != 0, ClientInputFocus.Mouse);
-							HandleButton("WMouse C", (mouseBtns & MouseButtons.Middle) != 0, ClientInputFocus.Mouse);
+							HandleButton("WMouse M", (mouseBtns & MouseButtons.Middle) != 0, ClientInputFocus.Mouse);
 							HandleButton("WMouse R", (mouseBtns & MouseButtons.Right) != 0, ClientInputFocus.Mouse);
 							HandleButton("WMouse 1", (mouseBtns & MouseButtons.XButton1) != 0, ClientInputFocus.Mouse);
 							HandleButton("WMouse 2", (mouseBtns & MouseButtons.XButton2) != 0, ClientInputFocus.Mouse);
@@ -238,7 +246,7 @@ namespace BizHawk.Client.EmuHawk
 #if false // don't do this: for now, it will interfere with the virtualpad. don't do something similar for the mouse position either
 							// unpress all buttons
 							HandleButton("WMouse L", false, ClientInputFocus.Mouse);
-							HandleButton("WMouse C", false, ClientInputFocus.Mouse);
+							HandleButton("WMouse M", false, ClientInputFocus.Mouse);
 							HandleButton("WMouse R", false, ClientInputFocus.Mouse);
 							HandleButton("WMouse 1", false, ClientInputFocus.Mouse);
 							HandleButton("WMouse 2", false, ClientInputFocus.Mouse);
@@ -254,9 +262,9 @@ namespace BizHawk.Client.EmuHawk
 						foreach (var ie in _newEvents)
 						{
 							//events are swallowed in some cases:
-							if ((ie.LogicalButton.Modifiers & LogicalButton.MASK_ALT) is not 0U && ShouldSwallow(MainFormInputAllowedCallback(true), ie))
+							if ((ie.LogicalButton.Modifiers & LogicalButton.MASK_ALT) is not 0U && ShouldSwallow(MainFormInputAllowedCallback(true), ie.Source))
 								continue;
-							if (ie.EventType == InputEventType.Press && ShouldSwallow(allowInput, ie))
+							if (ie.EventType == InputEventType.Press && ShouldSwallow(allowInput, ie.Source))
 								continue;
 
 							EnqueueEvent(ie);
@@ -267,13 +275,13 @@ namespace BizHawk.Client.EmuHawk
 				} //lock(this)
 
 				//arbitrary selection of polling frequency:
-				Thread.Sleep(10);
+				Thread.Sleep(2);
 			}
 		}
 
-		private static bool ShouldSwallow(AllowInput allowInput, InputEvent inputEvent)
+		private static bool ShouldSwallow(AllowInput allowInput, ClientInputFocus inputFocus)
 		{
-			return allowInput == AllowInput.None || (allowInput == AllowInput.OnlyController && inputEvent.Source != ClientInputFocus.Pad);
+			return allowInput == AllowInput.None || (allowInput == AllowInput.OnlyController && inputFocus != ClientInputFocus.Pad);
 		}
 
 		public void StartListeningForAxisEvents()
@@ -330,7 +338,7 @@ namespace BizHawk.Client.EmuHawk
 				{
 					InputEvent ie = DequeueEvent();
 
-					if (ShouldSwallow(allowInput, ie)) continue;
+					if (ShouldSwallow(allowInput, ie.Source)) continue;
 
 					if (ie.EventType == InputEventType.Press)
 					{
