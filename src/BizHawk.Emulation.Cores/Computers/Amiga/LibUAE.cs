@@ -6,23 +6,23 @@ using BizHawk.Emulation.Cores.Waterbox;
 
 namespace BizHawk.Emulation.Cores.Computers.Amiga
 {
-	public abstract class LibPUAE : LibWaterboxCore
+	public abstract class LibUAE : LibWaterboxCore
 	{
 		public const int PAL_WIDTH = 720;
 		public const int NTSC_WIDTH = PAL_WIDTH;
 		// the core renders 576 which is what libretro displays
-		// but default window height is 568 in original PUAE and WinUAE
+		// but default window height is 568 in original UAE and WinUAE
 		// this lets us hide a black line and a weird artifact that our A600 config has there
 		public const int PAL_HEIGHT = 568;
 		// WinUAE displays 484 lines for NTSC
 		// but libretro port only renders 482 and then only displays 480
 		public const int NTSC_HEIGHT = 482;
-		// libretro defines PUAE_VIDEO_HZ_PAL as 49.9204101562500000f
-		public const int PUAE_VIDEO_NUMERATOR_PAL = 102237;
-		public const int PUAE_VIDEO_DENOMINATOR_PAL = 2048;
-		// libretro defines PUAE_VIDEO_HZ_NTSC as 59.8260993957519531f
-		public const int PUAE_VIDEO_NUMERATOR_NTSC = 299130497;
-		public const int PUAE_VIDEO_DENOMINATOR_NTSC = 5000000;
+		// libretro defines UAE_VIDEO_HZ_PAL as 49.9204101562500000f
+		public const int UAE_VIDEO_NUMERATOR_PAL = 102237;
+		public const int UAE_VIDEO_DENOMINATOR_PAL = 2048;
+		// libretro defines UAE_VIDEO_HZ_NTSC as 59.8260993957519531f
+		public const int UAE_VIDEO_NUMERATOR_NTSC = 299130497;
+		public const int UAE_VIDEO_DENOMINATOR_NTSC = 5000000;
 
 		public const int FASTMEM_AUTO = -1;
 		public const int MAX_FLOPPIES = 4;
@@ -56,6 +56,9 @@ namespace BizHawk.Emulation.Cores.Computers.Amiga
 
 		[BizImport(CC, Compatibility = true)]
 		public abstract bool Init(int argc, string[] argv);
+
+		[BizImport(CC)]
+		public abstract void SetLEDCallback(EmptyCallback callback);
 
 		[StructLayout(LayoutKind.Sequential)]
 		public new class FrameInfo : LibWaterboxCore.FrameInfo
@@ -103,24 +106,24 @@ namespace BizHawk.Emulation.Cores.Computers.Amiga
 		[Flags]
 		public enum AllButtons : short
 		{
-			Up      = 0b0000000000000001,
-			Down    = 0b0000000000000010,
-			Left    = 0b0000000000000100,
-			Right   = 0b0000000000001000,
+			Up       = 0b0000000000000001,
+			Down     = 0b0000000000000010,
+			Left     = 0b0000000000000100,
+			Right    = 0b0000000000001000,
 			Button_1 = 0b0000000000010000,
 			Button_2 = 0b0000000000100000,
 			Button_3 = 0b0000000001000000,
-			Play    = 0b0000000010000000,
-			Rewind  = 0b0000000100000000,
-			Forward = 0b0000001000000000,
-			Green   = 0b0000010000000000,
-			Yellow  = 0b0000100000000000,
-			Red     = 0b0001000000000000,
-			Blue    = 0b0010000000000000
+			Play     = 0b0000000010000000,
+			Rewind   = 0b0000000100000000,
+			Forward  = 0b0000001000000000,
+			Green    = 0b0000010000000000,
+			Yellow   = 0b0000100000000000,
+			Red      = 0b0001000000000000,
+			Blue     = 0b0010000000000000
 		}
 
 		// https://wiki.amigaos.net/wiki/Keymap_Library
-		public enum PUAEKeyboard : int
+		public enum UAEKeyboard : int
 		{
 			Key_Backquote      = 0x00,
 			Key_1              = 0x01,

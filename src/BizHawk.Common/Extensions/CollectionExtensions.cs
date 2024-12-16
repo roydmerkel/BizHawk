@@ -234,6 +234,7 @@ namespace BizHawk.Common.CollectionExtensions
 			return null;
 		}
 
+#if !NET7_0_OR_GREATER
 		/// <remarks>shorthand for <c>this.OrderBy(static e => e)</c>, backported from .NET 7</remarks>
 		public static IOrderedEnumerable<T> Order<T>(this IEnumerable<T> source)
 			where T : IComparable<T>
@@ -243,6 +244,7 @@ namespace BizHawk.Common.CollectionExtensions
 		public static IOrderedEnumerable<T> OrderDescending<T>(this IEnumerable<T> source)
 			where T : IComparable<T>
 			=> source.OrderByDescending(ReturnSelf);
+#endif
 
 		/// <inheritdoc cref="List{T}.RemoveAll"/>
 		/// <remarks>
@@ -288,6 +290,24 @@ namespace BizHawk.Common.CollectionExtensions
 				i++;
 			}
 			return true;
+		}
+
+		public static ReadOnlySpan<T> Slice<T>(this ReadOnlySpan<T> span, Range range)
+		{
+			var (offset, length) = range.GetOffsetAndLength(span.Length);
+			return span.Slice(start: offset, length: length);
+		}
+
+		public static Span<T> Slice<T>(this Span<T> span, Range range)
+		{
+			var (offset, length) = range.GetOffsetAndLength(span.Length);
+			return span.Slice(start: offset, length: length);
+		}
+
+		public static string Substring(this string str, Range range)
+		{
+			var (offset, length) = range.GetOffsetAndLength(str.Length);
+			return str.Substring(startIndex: offset, length: length);
 		}
 
 		/// <summary>shallow clone</summary>

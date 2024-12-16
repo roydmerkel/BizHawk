@@ -819,7 +819,22 @@ namespace BizHawk.Client.EmuHawk
 				}
 				else
 				{
-					RightClickMenu.Show(TasView, e.X, e.Y);
+					var offset = new Point(0);
+					var topLeft = Cursor.Position;
+					var bottomRight = new Point(
+						topLeft.X + RightClickMenu.Width,
+						topLeft.Y + RightClickMenu.Height);
+					var screen = Screen.AllScreens.First(s => s.WorkingArea.Contains(topLeft));
+					// if we don't fully fit, move to the other side of the pointer
+					if (bottomRight.X > screen.WorkingArea.Right)
+						offset.X -= RightClickMenu.Width;
+					if (bottomRight.Y > screen.WorkingArea.Bottom)
+						offset.Y -= RightClickMenu.Height;
+					topLeft.Offset(offset);
+					// if the screen is insultingly tiny, best we can do is avoid negative pos
+					RightClickMenu.Show(
+						Math.Max(0, topLeft.X),
+						Math.Max(0, topLeft.Y));
 				}
 			}
 			else if (e.Button == MouseButtons.Left)
@@ -886,6 +901,9 @@ namespace BizHawk.Client.EmuHawk
 				}
 				else
 				{
+					// needed for AutoAdjustInput() when it removes was-lag frames
+					MainForm.HoldFrameAdvance = true;
+
 					GoToFrame(Emulator.Frame - notch);
 				}
 			}
@@ -903,20 +921,12 @@ namespace BizHawk.Client.EmuHawk
 
 					if (existingMarker != null)
 					{
-						MarkerControl.EditMarkerPopUp(existingMarker, openAtMouseCursor: true);
+						MarkerControl.EditMarkerPopUp(existingMarker);
 					}
 					else
 					{
-						if (Settings.EmptyMarkers)
-						{
-							CurrentTasMovie.Markers.Add(TasView.CurrentCell.RowIndex.Value, "");
-							RefreshDialog();
-						}
-						else
-						{
-							ClearLeftMouseStates();
-							MarkerControl.AddMarker(TasView.CurrentCell.RowIndex.Value, false);
-						}
+						ClearLeftMouseStates();
+						MarkerControl.AddMarker(TasView.CurrentCell.RowIndex.Value);
 					}
 				}
 			}

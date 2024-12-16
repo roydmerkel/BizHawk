@@ -74,21 +74,31 @@ namespace BizHawk.Client.EmuHawk
 			return menu;
 		}
 
-		public static void CenterOn(this Form form, Control logicalParent)
-			=> form.CenterOn((logicalParent is Form ? logicalParent : logicalParent.Parent)
-				.ChildPointToScreen(logicalParent) + logicalParent.HalfSize());
-
-		public static void CenterOn(this Form form, Point point)
+		public static Point ChildPointToScreen(this Control control, Control child)
 		{
-			// not asserting `form` is closed at this point, but we could
-			point -= form.HalfSize();
+			return control.PointToScreen(new Point(child.Location.X, child.Location.Y));
+		}
+
+		public static void FollowMousePointer(this Form form)
+		{
+			var point = Cursor.Position;
+			point.Offset(form.Width / -2, form.Height / -2);
 			form.StartPosition = FormStartPosition.Manual;
 			form.Location = point;
 		}
 
-		public static Point ChildPointToScreen(this Control control, Control child)
+		public static DialogResult ShowDialogOnScreen(this Form form)
 		{
-			return control.PointToScreen(new Point(child.Location.X, child.Location.Y));
+			var topLeft = new Point(
+				Math.Max(0, form.Location.X),
+				Math.Max(0, form.Location.Y));
+			var screen = Screen.AllScreens.First(s => s.WorkingArea.Contains(topLeft));
+			var w = screen.WorkingArea.Right - form.Bounds.Right;
+			var h = screen.WorkingArea.Bottom - form.Bounds.Bottom;
+			if (h < 0) topLeft.Y += h;
+			if (w < 0) topLeft.X += w;
+			form.SetDesktopLocation(topLeft.X, topLeft.Y);
+			return form.ShowDialog();
 		}
 
 		public static Color Add(this Color color, int val)
@@ -142,9 +152,6 @@ namespace BizHawk.Client.EmuHawk
 		/// </summary>
 		public static IEnumerable<Control> Controls(this Control control)
 			=> control.Controls.Cast<Control>();
-
-		public static Size HalfSize(this Control c)
-			=> new(c.Width / 2, c.Height / 2);
 
 		public static IEnumerable<TabPage> TabPages(this TabControl tabControl)
 		{

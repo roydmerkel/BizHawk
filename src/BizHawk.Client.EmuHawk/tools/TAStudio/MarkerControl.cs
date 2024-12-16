@@ -175,7 +175,8 @@ namespace BizHawk.Client.EmuHawk
 						""
 				};
 
-				if (!this.ShowDialogWithTempMute(i).IsOk()) return;
+				i.FollowMousePointer();
+				if (!i.ShowDialogOnScreen().IsOk()) return;
 
 				UpdateTextColumnWidth();
 				marker = new TasMovieMarker(frame, i.PromptText);
@@ -205,7 +206,7 @@ namespace BizHawk.Client.EmuHawk
 			}
 		}
 
-		public void EditMarkerPopUp(TasMovieMarker marker, bool openAtMouseCursor = false)
+		public void EditMarkerPopUp(TasMovieMarker marker)
 		{
 			var markerFrame = marker.Frame;
 			var i = new InputPrompt
@@ -218,12 +219,9 @@ namespace BizHawk.Client.EmuHawk
 					? Markers.PreviousOrCurrent(markerFrame).Message
 					: ""
 			};
-			if (openAtMouseCursor)
-			{
-				i.StartPosition = FormStartPosition.Manual;
-				i.Location = Cursor.Position - i.HalfSize(); // eww
-			}
-			if (!this.ShowDialogWithTempMute(i).IsOk()) return;
+
+			i.FollowMousePointer();
+			if (!i.ShowDialogOnScreen().IsOk()) return;
 
 			marker.Message = i.PromptText;
 			UpdateTextColumnWidth();
@@ -243,7 +241,8 @@ namespace BizHawk.Client.EmuHawk
 					: "0",
 			};
 
-			if (!this.ShowDialogWithTempMute(i).IsOk()
+			i.FollowMousePointer();
+			if (!i.ShowDialogOnScreen().IsOk()
 				|| !int.TryParse(i.PromptText, out var promptValue)
 				|| Markers.IsMarker(promptValue)) // don't move to frame with an existing marker
 			{

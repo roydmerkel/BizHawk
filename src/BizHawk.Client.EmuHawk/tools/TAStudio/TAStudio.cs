@@ -70,8 +70,6 @@ namespace BizHawk.Client.EmuHawk
 				ScrollSpeed = 6;
 				FollowCursorAlwaysScroll = false;
 				FollowCursorScrollMethod = "near";
-				BranchCellHoverInterval = 1;
-				SeekingCutoffInterval = 2;
 				AutosaveInterval = 120000;
 				AutosaveAsBk2 = false;
 				AutosaveAsBackupFile = false;
@@ -80,6 +78,7 @@ namespace BizHawk.Client.EmuHawk
 				OldControlSchemeForBranches = false;
 				LoadBranchOnDoubleClick = true;
 				CopyIncludesFrameNo = false;
+				AutoadjustInput = false;
 
 				// default to taseditor fashion
 				DenoteStatesWithIcons = false;
@@ -94,12 +93,9 @@ namespace BizHawk.Client.EmuHawk
 			public bool AutoPause { get; set; }
 			public bool AutoRestoreLastPosition { get; set; }
 			public bool FollowCursor { get; set; }
-			public bool EmptyMarkers { get; set; }
 			public int ScrollSpeed { get; set; }
 			public bool FollowCursorAlwaysScroll { get; set; }
 			public string FollowCursorScrollMethod { get; set; }
-			public int BranchCellHoverInterval { get; set; }
-			public int SeekingCutoffInterval { get; set; } // unused, relying on VisibleRows is smarter
 			public uint AutosaveInterval { get; set; }
 			public bool AutosaveAsBk2 { get; set; }
 			public bool AutosaveAsBackupFile { get; set; }
@@ -115,8 +111,9 @@ namespace BizHawk.Client.EmuHawk
 			public int BranchMarkerSplitDistance { get; set; }
 			public bool BindMarkersToInput { get; set; }
 			public bool CopyIncludesFrameNo { get; set; }
+			public bool AutoadjustInput { get; set; }
 			public TAStudioPalette Palette { get; set; }
-			public int MaxUndoSteps { get; set; } = 100;
+			public int MaxUndoSteps { get; set; } = 1000;
 		}
 
 		public TAStudio()
@@ -183,8 +180,6 @@ namespace BizHawk.Client.EmuHawk
 			TasView.ScrollSpeed = Settings.ScrollSpeed;
 			TasView.AlwaysScroll = Settings.FollowCursorAlwaysScroll;
 			TasView.ScrollMethod = Settings.FollowCursorScrollMethod;
-			TasView.SeekingCutoffInterval = Settings.SeekingCutoffInterval;
-			BookMarkControl.HoverInterval = Settings.BranchCellHoverInterval;
 
 			_autosaveTimer = new Timer(components);
 			_autosaveTimer.Tick += AutosaveTimerEventProcessor;
@@ -1106,16 +1101,38 @@ namespace BizHawk.Client.EmuHawk
 			{
 				if (lagLog.WasLagged.Value && !isLag)
 				{
+					// remove all consecutive was-lag frames in batch like taseditor
+					// current frame has no lag so they will all have to go anyway
+					var framesToRemove = new List<int>{ Emulator.Frame - 1 };
+					for (int frame = Emulator.Frame; CurrentTasMovie[frame].WasLagged.HasValue; frame++)
+					{
+						if (CurrentTasMovie[frame].WasLagged.Value)
+						{
+							framesToRemove.Add(frame);
+						}
+						else
+						{
+							break;
+						}
+					}
+
 					// Deleting this frame requires rewinding a frame.
 					CurrentTasMovie.ChangeLog.AddInputBind(Emulator.Frame - 1, true, $"Bind Input; Delete {Emulator.Frame - 1}");
 					bool wasRecording = CurrentTasMovie.ChangeLog.IsRecording;
 					CurrentTasMovie.ChangeLog.IsRecording = false;
-
-					CurrentTasMovie.RemoveFrame(Emulator.Frame - 1);
-					CurrentTasMovie.LagLog.RemoveHistoryAt(Emulator.Frame); // Removes from WasLag
-
+					CurrentTasMovie.RemoveFrames(framesToRemove);
+					foreach (int f in framesToRemove)
+					{
+						CurrentTasMovie.LagLog.RemoveHistoryAt(f + 1); // Removes from WasLag
+					}
 					CurrentTasMovie.ChangeLog.IsRecording = wasRecording;
-					GoToFrame(Emulator.Frame - 1);
+
+					CurrentTasMovie.LastPositionStable = true;
+					GoToLastEmulatedFrameIfNecessary(Emulator.Frame - 1);
+					if (!MainForm.HoldFrameAdvance)
+					{
+						MainForm.PauseOnFrame = LastPositionFrame;
+					}
 					return true;
 				}
 
